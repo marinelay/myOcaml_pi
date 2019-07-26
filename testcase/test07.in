@@ -1,0 +1,4 @@
+let set(flag) = flag := true in () in
+let reset(flag) = flag := false in () in
+let is_empty = ref true in
+reset(is_empty); !is_empty

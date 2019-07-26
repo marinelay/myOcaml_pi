@@ -1,0 +1,5 @@
+let counter = ref 0 in
+let add(x) =
+  counter := !counter + 1 in
+  !counter + x in
+add(add(add(add(add(0)))))

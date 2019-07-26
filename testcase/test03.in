@@ -1,0 +1,3 @@
+let inc(x) = let x = x + 1 in x in
+let a = 1 in
+inc(a); inc(a); a

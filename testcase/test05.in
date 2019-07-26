@@ -1,0 +1,2 @@
+let add(x) = let aux(y) = x + y in aux in
+add(9)(16)

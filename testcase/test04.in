@@ -1,0 +1,2 @@
+let double (x) = if not (x == 0) then double(x - 1) + 2 else 0 in
+double (4)
