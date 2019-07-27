@@ -42,8 +42,6 @@ exp:
   | TRUE { Calc.TRUE }
   | FALSE { Calc.FALSE }
   | ID { Calc.VAR $1 }
-  | REF exp { Calc.NEW $2 }
-  | EXCMARK exp { Calc.REF $2 }
   | LPAREN exp RPAREN { $2 }
   | exp PLUS exp { Calc.ADD ($1, $3) }
   | exp MINUS exp { Calc.SUB ($1, $3) }
@@ -54,11 +52,9 @@ exp:
   | exp LE exp { Calc.LE ($1, $3) }
   | exp GT exp { Calc.GT ($1, $3) }
   | exp GE exp { Calc.GE ($1, $3) }
+  | ID COLEQ exp SEMI exp { Calc.ASSIGN ($1, $3, $5) }
   | NOT exp { Calc.NOT ($2) }
-  | IF exp THEN exp ELSE exp { Calc.IF ($2, $4, $6) }
-  | LET ID EQUAL exp IN exp { Calc.LET ($2, $4, $6) }
-  | LET ID LPAREN ID RPAREN EQUAL exp IN exp { Calc.LETREC ($2, $4, $7, $9) }
-  | ID COLEQ exp IN exp { Calc.ASSIGN ($1, $3, $5) }
+  | IF LPAREN exp RPAREN LCURLY exp RCURLY ELSE exp  { Calc.IF ($3, $6, $9) }
   | exp LPAREN exp RPAREN { Calc.CALL_FUN ($1, $3) }
   | exp SEMI exp { Calc.SEQ ($1, $3) }
 
