@@ -46,7 +46,10 @@ let init_sym_cnt () = sym_cnt := 0
 let new_sym () = sym_cnt := !sym_cnt + 1; !sym_cnt
 
 let empty_env = []
-let append_env env (x, v) = (x, v)::env
+let rec append_env env (x, v) = (* 값이 있으면 수정하고 없으면 새로 추가 *)
+  match env with
+  | [] -> (x,v)
+  | (y, w)::tl -> if y=x then (x,v)::tl else (y, w)::(append_env tl (x,v)) 
 let rec apply_env env x =
   match env with
   | [] -> raise(Failure "None in env")
@@ -149,8 +152,36 @@ let rec eval_exp : exp -> env -> path_cond -> (value * path_cond) list
             )
           )
       )
-  | ASSIGN (x, e) -> 
-    let l = eval_exp e env pi in
-      eval_exp_aux l (fun v pi -> eval_exp x (append_env env (x, v) pi))
   | SEQ (e1, e2) ->
     let _ = eval_exp e1 env pi in eval_exp e2 env pi
+
+  | ASSIGN (x, e1, e2) ->
+    let l1 = eval_exp e1 env pi in
+      sym_eval_exp l1 (fun v pi -> eval exp e2 (append(x, v) pi)) 
+
+  | FUNC_START (f, args, body) -> 
+    let rec args_to_value : (var * var) list -> env -> (value * path_cond) list
+    = fun args env ->
+      (match args with
+      | [] -> eval_exp body env pi
+      | (vType, vName)::tl ->
+        let l = new_sym () in
+        (match vType, vName with
+        | "int", _ -> args_to_value tl (append_env (vName, SInt l))
+        | "bool", _ -> args_to_value tl (append_env (vName, SBool l))
+        ) 
+      )
+  
+  (* 차후 구현 *)
+  (*| FOR (x, init, cond, next, body) -> 
+    let l1 = eval_exp init env pi in
+      sym_eval_exp l1 (fun v1 pi ->
+        let env = (append_env (x, v))
+        let l2 = eval_exp cond env pi in
+          sym_eval_exp l2 (fun v2 pi ->
+            (match v2 with
+            | Bool b -> eval_exp (if b then body else Unit) env pi
+            | SBool _ -> (eval_exp body env (AND(pi, EQ(v2, Bool true))))@(eval_exp Unit env (AND(pi, EQ(v2, Bool false))))
+            )
+          ) 
+      )*)

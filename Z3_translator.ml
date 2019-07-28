@@ -65,3 +65,6 @@ let rec path2expr_aux : context -> path_exp -> Expr.expr
   | LESSEQUAL (v1, v2) -> le ctx (path2expr_aux ctx p1) (path2expr_aux ctx p2)
   | GREATTHAN (v1, v2) -> gt ctx (path2expr_aux ctx p1) (path2expr_aux ctx p2)
   | GREATEQUAL (v1, v2) -> ge ctx (path2expr_aux ctx p1) (path2expr_aux ctx p2)
+
+let path2expr : path_exp -> Expr.expr
+= fun p -> path2expr_aux (new_ctx ()) p
