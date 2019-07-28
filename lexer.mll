@@ -10,8 +10,7 @@
     ; ("TRUE", TRUE)
     ; ("false", FALSE)
     ; ("FALSE", FALSE)
-    ; ("ref", REF)
-    ; ("REF", REF)
+    ; ("int", INT)
     ; ("not", NOT)
     ; ("NOT", NOT)
     ; ("if", IF)
@@ -20,10 +19,6 @@
     ; ("THEN", THEN)
     ; ("else", ELSE)
     ; ("ELSE", ELSE)
-    ; ("let", LET)
-    ; ("LET", LET)
-    ; ("in", IN)
-    ; ("IN", IN)
   ]
 }
 
@@ -39,6 +34,7 @@ rule start = parse
     let id = Lexing.lexeme lexbuf in
     try Hashtbl.find keyword_table id with _ -> ID id
   }
+  | "@" { AT }
   | "!" { EXCMARK }
   | "+" { PLUS }
   | "-" { MINUS }
@@ -46,6 +42,10 @@ rule start = parse
   | "/" { SLASH }
   | "(" { LPAREN }
   | ")" { RPAREN }
+  | "{" { LCURLY}
+  | "}" { RCURLY }
+  | "[" { LBOCK }
+  | "]" { RBLOCK }
   | "==" {EQEQ}
   | "<" { LT }
   | "<=" { LE }
