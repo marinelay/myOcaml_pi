@@ -42,7 +42,7 @@ rule start = parse
   | "/" { SLASH }
   | "(" { LPAREN }
   | ")" { RPAREN }
-  | "{" { LCURLY}
+  | "{" { LCURLY }
   | "}" { RCURLY }
   | "[" { LBOCK }
   | "]" { RBLOCK }

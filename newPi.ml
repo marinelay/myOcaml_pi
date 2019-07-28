@@ -9,8 +9,9 @@ type exp =
   | LE of exp * exp
   | GT of exp * exp
   | GE of exp * exp
-  | ASSIGN of var * exp
+  | ASSIGN of var * exp * exp
   | SEQ of exp * exp
+  | FUNC_START of var * (var * var) list * exp
 and var = string
 ;;
 
@@ -48,7 +49,7 @@ let new_sym () = sym_cnt := !sym_cnt + 1; !sym_cnt
 let empty_env = []
 let rec append_env env (x, v) = (* 값이 있으면 수정하고 없으면 새로 추가 *)
   match env with
-  | [] -> (x,v)
+  | [] -> [(x,v)]
   | (y, w)::tl -> if y=x then (x,v)::tl else (y, w)::(append_env tl (x,v)) 
 let rec apply_env env x =
   match env with
@@ -157,20 +158,20 @@ let rec eval_exp : exp -> env -> path_cond -> (value * path_cond) list
 
   | ASSIGN (x, e1, e2) ->
     let l1 = eval_exp e1 env pi in
-      sym_eval_exp l1 (fun v pi -> eval exp e2 (append(x, v) pi)) 
+      eval_exp_aux l1 (fun v pi -> eval_exp e2 (append_env env (x, v)) pi) 
 
   | FUNC_START (f, args, body) -> 
-    let rec args_to_value : (var * var) list -> env -> (value * path_cond) list
-    = fun args env ->
+    let rec args_to_value : (var * var) list -> exp -> env -> (value * path_cond) list
+    = fun args body env ->
       (match args with
       | [] -> eval_exp body env pi
       | (vType, vName)::tl ->
         let l = new_sym () in
-        (match vType, vName with
-        | "int", _ -> args_to_value tl (append_env (vName, SInt l))
-        | "bool", _ -> args_to_value tl (append_env (vName, SBool l))
+        (match vType with
+        | "int" -> args_to_value tl body (append_env env (vName, SInt l))
+        | "bool" -> args_to_value tl body (append_env env (vName, SBool l))
         ) 
-      )
+      ) in args_to_value args body env
   
   (* 차후 구현 *)
   (*| FOR (x, init, cond, next, body) -> 
@@ -184,4 +185,6 @@ let rec eval_exp : exp -> env -> path_cond -> (value * path_cond) list
             | SBool _ -> (eval_exp body env (AND(pi, EQ(v2, Bool true))))@(eval_exp Unit env (AND(pi, EQ(v2, Bool false))))
             )
           ) 
-      )*)
+      )
+    *)
+;;
