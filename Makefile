@@ -1,12 +1,31 @@
+#load "str.cma"
+
 TARGET = run
 
 all: $(TARGET)
 
-$(TARGET): lexer.cmo parser.cmo calc.cmo main.cmo
+$(TARGET):  util.cmo lexer.cmo parser.cmo z3_translator.cmo calc.cmo simplify.cmo solve.cmo main.cmo
 	ocamlc -o $@ $^
 
-calc.cmo : newPi.ml
-	ocamlc -c newPi.ml
+
+
+
+util.cmo : util.ml
+	ocamlc -c util.ml
+
+z3_translator.cmo : z3_translator.ml
+	ocamlfind ocamlc -c -linkpkg -package str -package z3 -o -thread z3_translator.ml
+
+calc.cmo : calc.ml
+	ocamlc -c  calc.ml
+
+simplify.cmo : simplify.ml
+	ocamlfind ocamlc -linkpkg -package z3 -c simplify.ml
+
+solve.cmo : solve.ml
+	ocamlfind ocamlc -linkpkg -package z3 -c solve.ml
+
+
 
 parser.ml: parser.mly calc.cmo
 	ocamlyacc parser.mly
@@ -21,7 +40,7 @@ parser.cmo: parser.ml parser.cmi
 	ocamlc -c parser.ml
 
 main.cmo : calc.cmo main.ml
-	ocamlc -c main.ml
+	ocamlfind ocamlc -linkpkg -package z3 -c main.ml
 
 lexer.cmo: lexer.ml
 	ocamlc -c lexer.ml

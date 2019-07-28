@@ -19,6 +19,8 @@
     ; ("THEN", THEN)
     ; ("else", ELSE)
     ; ("ELSE", ELSE)
+    ; ("return", RETURN)
+    ; ("and", AND_S)
   ]
 }
 
@@ -29,22 +31,18 @@ let digit = ['0'-'9']+
 rule start = parse
     blank { start lexbuf }
   | "(*" { comment_depth := 1; comment lexbuf; start lexbuf }
-  | digit { NUM (float_of_string (Lexing.lexeme lexbuf)) }
+  | digit { NUM (int_of_string (Lexing.lexeme lexbuf)) }
   | id {
     let id = Lexing.lexeme lexbuf in
     try Hashtbl.find keyword_table id with _ -> ID id
   }
   | "@" { AT }
-  | "!" { EXCMARK }
   | "+" { PLUS }
-  | "-" { MINUS }
-  | "*" { STAR }
-  | "/" { SLASH }
   | "(" { LPAREN }
   | ")" { RPAREN }
   | "{" { LCURLY }
   | "}" { RCURLY }
-  | "[" { LBOCK }
+  | "[" { LBLOCK }
   | "]" { RBLOCK }
   | "==" {EQEQ}
   | "<" { LT }
