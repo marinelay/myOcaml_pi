@@ -14,7 +14,7 @@ and exp =
   | GE of exp * exp
   | ASSIGN of var * exp * exp
   | SEQ of exp * exp
-  | FUNC_START of (var * var) list * exp
+  | FUNC_START of exp list * (var * var) list * exp * exp list
   | FOR of exp list * var * exp * exp * var * exp * exp * exp
   | RETURN of exp
 and var = string
@@ -56,10 +56,7 @@ let init_sym_cnt () = sym_cnt := 0
 let new_sym () = sym_cnt := !sym_cnt + 1; !sym_cnt
 
 let empty_env = []
-let rec append_env env (x, v) = (* 값이 있으면 수정하고 없으면 새로 추가 *)
-  match env with
-  | [] -> [(x,v)]
-  | (y, w)::tl -> if y=x then (x,v)::tl else (y, w)::(append_env tl (x,v)) 
+let rec append_env env (x, v) = (x, v)::env
 let rec apply_env env x =
   match env with
   | [] -> raise(Failure "None in env")
@@ -108,29 +105,30 @@ let rec eval_exp_aux : (value * path_cond) list -> (value -> path_cond -> (value
   | (y, pi)::tl -> (f y pi)@(eval_exp_aux tl f)
 
 
-let rec eval_exp : exp -> env -> path_cond -> (value * path_cond) list
-= fun exp env pi ->
+
+let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * path_cond) list
+= fun exp env pi pre post ->
   match exp with
-  | UNIT -> [(Unit, pi)]
+  | UNIT -> [(Bool true, pi)]
   | INT n -> [(Int n, pi)]
   | TRUE -> [(Bool true, pi)]
   | FALSE -> [(Bool false, pi)]
   | VAR v -> [(apply_env env v, pi)]
   | IF (cond, body1, body2, out) ->
-    let l = eval_exp cond env pi in
+    let l = eval_exp cond env pi pre post in
       eval_exp_aux l (fun v pi ->
         (match v with
-        | Bool b -> eval_exp (if b then body1 else body2) env pi
-        | SBool _ -> let l = (eval_exp body1 env (AND(pi, EQ(v, Bool true))))@
-                              (eval_exp body2 env (AND(pi, EQ(v, Bool false))))
-                    in eval_exp_aux l (fun v pi -> eval_exp out env pi)
+        | Bool b -> eval_exp (if b then body1 else body2) env pi pre post
+        | SBool _ -> let l = (eval_exp body1 env (AND(pi, EQ(v, Bool true))) pre post)@
+                              (eval_exp body2 env (AND(pi, EQ(v, Bool false))) pre post)
+                    in eval_exp_aux l (fun v pi -> eval_exp out env pi pre post)
         | _ -> raise(Failure "Type Error : IF")
         )
       )
   | ADD (e1, e2) ->
-    let l1 = eval_exp e1 env pi in
+    let l1 = eval_exp e1 env pi pre post in
       eval_exp_aux l1 (fun v1 pi ->
-        let l2 = eval_exp e2 env pi in
+        let l2 = eval_exp e2 env pi pre post in
           eval_exp_aux l2 (fun v2 pi ->
             (match (v1,v2) with
             | Bool _, _ | SBool _, _
@@ -142,9 +140,9 @@ let rec eval_exp : exp -> env -> path_cond -> (value * path_cond) list
       )
 
   | LT (e1, e2) ->
-    let l1 = eval_exp e1 env pi in
+    let l1 = eval_exp e1 env pi pre post in
       eval_exp_aux l1 (fun v1 pi ->
-        let l2 = eval_exp e2 env pi in
+        let l2 = eval_exp e2 env pi pre post in
           eval_exp_aux l2 (fun v2 pi ->
             (match (v1, v2) with
             | Bool _, _ | SBool _, _
@@ -155,9 +153,9 @@ let rec eval_exp : exp -> env -> path_cond -> (value * path_cond) list
           )
       )
   | LE (e1, e2) ->
-    let l1 = eval_exp e1 env pi in
+    let l1 = eval_exp e1 env pi pre post in
       eval_exp_aux l1 (fun v1 pi ->
-        let l2 = eval_exp e2 env pi in
+        let l2 = eval_exp e2 env pi pre post in
           eval_exp_aux l2 (fun v2 pi ->
             (match (v1, v2) with
             | Bool _, _ | SBool _, _
@@ -168,9 +166,9 @@ let rec eval_exp : exp -> env -> path_cond -> (value * path_cond) list
           )
       )
   | GT (e1, e2) ->
-    let l1 = eval_exp e1 env pi in
+    let l1 = eval_exp e1 env pi pre post in
       eval_exp_aux l1 (fun v1 pi ->
-        let l2 = eval_exp e2 env pi in
+        let l2 = eval_exp e2 env pi pre post in
           eval_exp_aux l2 (fun v2 pi ->
             (match (v1, v2) with
               | Bool _, _ | SBool _, _
@@ -181,9 +179,9 @@ let rec eval_exp : exp -> env -> path_cond -> (value * path_cond) list
           )
       )
   | GE (e1, e2) ->
-    let l1 = eval_exp e1 env pi in
+    let l1 = eval_exp e1 env pi pre post in
       eval_exp_aux l1 (fun v1 pi ->
-        let l2 = eval_exp e2 env pi in
+        let l2 = eval_exp e2 env pi pre post in
           eval_exp_aux l2 (fun v2 pi ->
             (match (v1, v2) with
             | Bool _, _ | SBool _, _
@@ -194,44 +192,49 @@ let rec eval_exp : exp -> env -> path_cond -> (value * path_cond) list
           )
       )
   | SEQ (e1, e2) ->
-    let _ = eval_exp e1 env pi in eval_exp e2 env pi
+    let _ = eval_exp e1 env pi pre post in eval_exp e2 env pi pre post
 
   | ASSIGN (x, e1, e2) ->
-    let l1 = eval_exp e1 env pi in
-      eval_exp_aux l1 (fun v pi -> eval_exp e2 (append_env env (x, v)) pi) 
+    let l1 = eval_exp e1 env pi pre post in
+      eval_exp_aux l1 (fun v pi -> eval_exp e2 (append_env env (x,v)) pi pre post)
 
-  | FUNC_START (args, body) -> 
-    let rec args_to_value : (var * var) list -> exp -> env -> (value * path_cond) list
-    = fun args body env ->
+  | FUNC_START (pre, args, body, post) -> 
+    let rec args_to_value : (var * var) list -> env -> env
+    = fun args env ->
       (match args with
-      | [] -> eval_exp body env pi
+      | [] -> env (* complete assign args *)
       | (vType, vName)::tl ->
         let l = new_sym () in
         (match vType with
-        | "int" -> args_to_value tl body (append_env env (vName, SInt l))
+        | "int" | "" -> args_to_value tl (append_env env (vName, SInt l))
+        (*| SArray n1 -> args_to_value tl body (append_env env (vName, SArray l))*)
         ) 
-      ) in args_to_value args body env
-  
+      ) in let env = args_to_value args env in 
+        let pre_exp = annotation_to_value pre env pi true in 
+        eval_exp_aux pre_exp (fun v pi ->
+          eval_exp body env pi pre post
+        )
 
   (* 차후 구현 *)
-  | FOR (pre, x1, init, cond, x2, next, body, out) -> 
-    let pre_exp = annotation_to_value pre env pi in
+  | FOR (pre, x1, init, cond, x2, next, body, out) ->
+    let post = pre in 
+    let pre_exp = annotation_to_value pre env pi (true) in
       eval_exp_aux pre_exp (fun v pi ->
-        let init_exp = eval_exp init env pi in
+        let init_exp = eval_exp init env pi pre post in
         eval_exp_aux init_exp (fun v1 pi ->
           let env = append_env env (x1, v1) in
-            let cond_exp = eval_exp cond env pi in
+            let cond_exp = eval_exp cond env pi pre post in
               eval_exp_aux cond_exp (fun v2 pi ->
                 (match v2 with
-                | Bool b -> eval_exp (if b then body else out) env pi
-                | SBool _ -> (let l1 = (eval_exp body env (AND(pi, EQ(v2, Bool true)))) 
+                | Bool b -> eval_exp (if b then body else out) env pi pre post
+                | SBool _ -> (let l1 = (eval_exp body env (AND(pi, EQ(v2, Bool true))) pre post) 
                               in eval_exp_aux l1 (fun v3 pi ->
                                 let env = append_env env (x2, v3) in
-                                let post_exp = annotation_to_value pre env pi in
+                                let post_exp = annotation_to_value post env pi true in
                                   eval_exp_aux post_exp (fun v pi ->
-                                    eval_exp out env pi
+                                    eval_exp out env pi pre post
                                   )
-                              ))@(eval_exp out env (AND(pi, EQ(v2, Bool false))))
+                              ))@(eval_exp out env (AND(pi, EQ(v2, Bool false))) pre post)
                 | _ -> raise(Failure "Type Error : IF")
                 )
               )
@@ -239,18 +242,20 @@ let rec eval_exp : exp -> env -> path_cond -> (value * path_cond) list
       )
 
   | RETURN (b) ->
-    let l = eval_exp b env pi in
-    eval_exp_aux l (fun v pi ->
-    match v with
-    | Bool true -> let AND(p1, p2) = pi in eval_exp UNIT env (AND(p1, NOT p2))
-    | Bool false -> eval_exp UNIT env pi
-    )
+    let l = annotation_to_value post env pi 
+      (match b with (* post condition은 not *)
+      | TRUE -> false
+      | FALSE -> true
+      )
+      in eval_exp_aux l (fun v pi -> 
+        eval_exp UNIT env pi pre post
+      )
     
-and annotation_to_value : exp list -> env -> path_cond -> (value * path_cond) list
-= fun logic env pi ->
+and annotation_to_value : exp list -> env -> path_cond -> bool -> (value * path_cond) list
+= fun logic env pi is_pre ->
   match logic with
-  | [] -> [(Bool true, pi)]
-  | hd::tl -> let l = eval_exp hd env pi in
+  | [] -> if is_pre then [(Bool true, pi)] else [(Bool true, NOT pi)]
+  | hd::tl -> let l = eval_exp hd env pi [] [] in
       eval_exp_aux l (fun v pi2 ->
-        annotation_to_value tl env (AND(pi, pi2))
+        annotation_to_value tl env (AND(pi, pi2)) is_pre
       )

@@ -1,8 +1,5 @@
-Test (int i) {
- if (x < 10) {
-   x := x+3
- } 
- else {
-  x := x+6
- }
+@true
+@x>10
+test (int x) {
+ ()
 }

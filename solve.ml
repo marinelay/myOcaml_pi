@@ -31,11 +31,12 @@ let rec solve : context -> solver -> (value * path_cond) list -> bool
     in let expr = fold (
       fun tup rst ->
       let (v, pi) = tup in
-      let eq_value = Z3_translator.eq ctx r (val2expr_aux ctx v) in (* ?? *)
+      (*let eq_value = Z3_translator.eq ctx r (val2expr_aux ctx v) in (* ?? *)*)
       let exp_pi = path2expr_aux ctx pi in
-      let exp = Z3_translator.and_b ctx eq_value exp_pi in
-      Z3_translator.or_b ctx exp rst
-    ) l1 (Z3_translator.const_b ctx false) in
+      (*let exp = Z3_translator.and_b ctx eq_value exp_pi in*)
+      Z3_translator.and_b ctx exp_pi rst
+    ) l1 (Z3_translator.const_b ctx true) in
+    let expr = Z3_translator.not_b ctx expr in
     let _ = Z3.Solver.add solver [expr] in
     match (check solver []) with
     | UNSATISFIABLE -> true

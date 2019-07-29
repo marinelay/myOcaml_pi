@@ -4,7 +4,7 @@ TARGET = run
 
 all: $(TARGET)
 
-$(TARGET):  util.cmo lexer.cmo parser.cmo z3_translator.cmo calc.cmo simplify.cmo solve.cmo main.cmo
+$(TARGET):  util.cmo z3_translator.cmo lexer.cmo parser.cmo calc.cmo simplify.cmo solve.cmo main.cmo
 	ocamlc -o $@ $^
 
 
@@ -14,7 +14,7 @@ util.cmo : util.ml
 	ocamlc -c util.ml
 
 z3_translator.cmo : z3_translator.ml
-	ocamlfind ocamlc -c -linkpkg -package str -package z3 -o -thread z3_translator.ml
+	ocamlfind ocamlc -c -linkpkg -package str -package z3 z3_translator.ml
 
 calc.cmo : calc.ml
 	ocamlc -c  calc.ml

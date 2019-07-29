@@ -30,9 +30,11 @@
 
 %left PLUS MINUS
 %left STAR SLASH
-%left SEMI
 %left AND OR
 %left AND_S
+%left SEMI
+%left AT
+
 
 %start program
 %type <Calc.program> program
@@ -45,23 +47,29 @@ program:
 exp:
     LPAREN RPAREN { Calc.UNIT }
   | NUM { Calc.INT $1 }
-  | TRUE { Calc.TRUE }
-  | FALSE { Calc.FALSE }
+  | bool { $1 }
   | ID { Calc.VAR $1 }
   | LPAREN exp RPAREN { $2 }
   | exp PLUS exp { Calc.ADD ($1, $3) }
   | compare { $1 }
-  | typ ID COLEQ exp SEMI exp { Calc.ASSIGN ($2, $4, $6) }
+  | var_typ ID COLEQ exp SEMI exp { Calc.ASSIGN ($2, $4, $6) }
   | IF LPAREN exp RPAREN LCURLY exp RCURLY ELSE LCURLY exp RCURLY exp  { Calc.IF ($3, $6, $10, $12) }
   | IF LPAREN exp RPAREN LCURLY exp RCURLY exp { Calc.IF ($3, $6, Calc.UNIT, $8) }
-  | ID LPAREN exps RPAREN exp { Calc.FUNC_START ($3, $5) }
+  | AT pre_conds AT pre_conds ID LPAREN exps RPAREN LCURLY exp RCURLY { Calc.FUNC_START ( $2, $7, $10, $4) }
   | exp SEMI exp { Calc.SEQ ($1, $3) }
   | AT pre_conds FOR LPAREN ID COLEQ exp SEMI exp SEMI ID COLEQ exp RPAREN LCURLY exp RCURLY exp { Calc.FOR ($2, $5, $7, $9, $11, $13, $16, $18) }
-  | RETURN exp { Calc.RETURN $2 }
+  | RETURN bool SEMI { Calc.RETURN $2 }
+
+bool:
+  | TRUE { Calc.TRUE }
+  | FALSE { Calc.FALSE }
+
+var_typ:
+  | { "" }
+  | INT { ("int") }
 
 typ:
-  | INT { "int" }
-  | { "int" }
+  | INT { ( "int" ) }
 
 exps:
   | typ ID exps { ($1,$2)::$3 }

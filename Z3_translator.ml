@@ -45,11 +45,17 @@ let rec val2expr_aux : context -> value -> Expr.expr
   match v with
   | Int n -> const_n ctx n
   | Bool b -> const_b ctx b
-  | SInt id -> mk_const ctx ("int_" ^ string_of_int id) (int_sort ctx)
-  | SBool id -> mk_const ctx ("bool_" ^ string_of_int id) (bool_sort ctx)
+  | SInt id -> mk_const ctx ("alpha_" ^ string_of_int id) (int_sort ctx)
+  | SBool id -> mk_const ctx ("beta_" ^ string_of_int id) (bool_sort ctx)
   | SArith (aop, v1, v2) ->
     (match aop with
     | SADD -> add ctx (val2expr_aux ctx v1) (val2expr_aux ctx v2)
+    )
+  | Sum l ->
+    (
+    match l with
+    | [] -> val2expr_aux ctx (Int 0)
+    | hd::tl -> add ctx (val2expr_aux ctx hd) (val2expr_aux ctx (Sum tl))
     )
 
 let val2expr : value -> Expr.expr
@@ -72,7 +78,7 @@ let rec expr2val : Expr.expr -> value
       match l with
       | [hd; tl] ->
         if hd = "alpha" then SInt (int_of_string tl)
-        else if tl = "beta" then SBool (int_of_string tl)
+        else if hd = "beta" then SBool (int_of_string tl)
         else raise (Failure "SHOULD NOT COME HERE")
       | _ -> raise (Failure "SHOULD NOT COME HERE")
     end
@@ -158,7 +164,7 @@ let funcdecl2val : FuncDecl.func_decl -> value
       | ["return"] -> Return
       | [hd; tl] ->
         if hd = "alpha" then SInt (int_of_string tl)
-        else if tl = "beta" then SBool (int_of_string tl)
+        else if hd = "beta" then SBool (int_of_string tl)
         else raise (Failure "SHOULD NOT COME HERE")
       | _ -> raise (Failure "SHOULD NOT COME HERE")
     end
