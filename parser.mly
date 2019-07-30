@@ -28,13 +28,16 @@
 %token FOR
 %token AND_S
 
+
 %left PLUS MINUS
 %left STAR SLASH
 %left AND OR
 %left AND_S
 %left SEMI
-%left AT
+%right AT
 
+%nonassoc FOR
+%nonassoc ELSE
 
 %start program
 %type <Calc.program> program
@@ -57,7 +60,7 @@ exp:
   | IF LPAREN exp RPAREN LCURLY exp RCURLY exp { Calc.IF ($3, $6, Calc.UNIT, $8) }
   | AT pre_conds AT pre_conds ID LPAREN exps RPAREN LCURLY exp RCURLY { Calc.FUNC_START ( $2, $7, $10, $4) }
   | exp SEMI exp { Calc.SEQ ($1, $3) }
-  | AT pre_conds FOR LPAREN ID COLEQ exp SEMI exp SEMI ID COLEQ exp RPAREN LCURLY exp RCURLY exp { Calc.FOR ($2, $5, $7, $9, $11, $13, $16, $18) }
+  | AT pre_conds FOR LPAREN var_typ ID COLEQ exp SEMI exp SEMI ID COLEQ exp RPAREN LCURLY exp RCURLY exp { Calc.FOR ($2, $6, $8, $10, $12, $14, $17, $19) }
   | RETURN bool SEMI { Calc.RETURN $2 }
 
 bool:
@@ -72,14 +75,15 @@ typ:
   | INT { ( "int" ) }
 
 exps:
-  | typ ID exps { ($1,$2)::$3 }
+  | exps typ ID { $1@[($2, $3)] }
   | typ ID { [($1,$2)] }
 
 pre_conds:
-  | compare AND_S pre_conds { $1::$3 }
+  | pre_conds AND_S compare { $1@[$3] }
   | compare { [$1] }
 
 compare:
+  | bool { $1 }
   | exp LT exp { Calc.LT ($1, $3) }
   | exp LE exp { Calc.LE ($1, $3) }
   | exp GT exp { Calc.GT ($1, $3) }

@@ -21,6 +21,7 @@
     ; ("ELSE", ELSE)
     ; ("return", RETURN)
     ; ("and", AND_S)
+    ; ("for", FOR)
   ]
 }
 

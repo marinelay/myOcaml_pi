@@ -26,16 +26,15 @@ type value =
   | Bool of bool
   (* symbol *)
   | SInt of id
-  | SBool of id
+  | SBool of sym_exp
   | SArith of arith_op * value * value
-  | Sum of value list
   | Return
 and arith_op = SADD
 and id = int
 and env = (var * value) list
 
 
-type sym_exp =
+and sym_exp =
   | TRUE | FALSE
   | NOT of sym_exp
   | AND of sym_exp * sym_exp
@@ -50,6 +49,7 @@ type sym_exp =
   | ORL of sym_exp list
 and path_cond = sym_exp
 
+let empty_algo = []
 
 let sym_cnt = ref 0
 let init_sym_cnt () = sym_cnt := 0
@@ -68,7 +68,7 @@ let rec value2str : value -> string
   | Int n -> string_of_int n
   | Bool b -> string_of_bool b
   | SInt id -> "alpha" ^ string_of_int id
-  | SBool id -> "beta" ^ string_of_int id
+  | SBool exp -> cond2str(exp)
   | SArith (aop, v1, v2) ->
     (match aop with
     | SADD -> "(" ^ value2str v1 ^ " + " ^ value2str v2 ^ ")"
@@ -76,7 +76,7 @@ let rec value2str : value -> string
   | Sum l -> "(" ^ fold (fun v1 s2 -> value2str v1 ^ (if s2 = ")" then "" else " + ") ^ s2) l ")"
   | Return -> "output"
 
-let rec cond2str : sym_exp -> string
+and cond2str : sym_exp -> string
 = fun pi ->
   match pi with
   | TRUE -> "true"
@@ -119,9 +119,9 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
       eval_exp_aux l (fun v pi ->
         (match v with
         | Bool b -> eval_exp (if b then body1 else body2) env pi pre post
-        | SBool _ -> let l = (eval_exp body1 env (AND(pi, EQ(v, Bool true))) pre post)@
-                              (eval_exp body2 env (AND(pi, EQ(v, Bool false))) pre post)
-                    in eval_exp_aux l (fun v pi -> eval_exp out env pi pre post)
+        | SBool b -> let l2 = (eval_exp body1 env (AND(pi, EQ(v, b))) pre post)@
+                              (eval_exp body2 env (AND(pi, NOT(EQ(v, b)))) pre post)
+                    in eval_exp_aux l2 (fun v pi -> eval_exp out env pi pre post)
         | _ -> raise(Failure "Type Error : IF")
         )
       )
@@ -148,7 +148,7 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
             | Bool _, _ | SBool _, _
             | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : LT")
             | Int n1, Int n2 -> [(Bool (n1 < n2), pi)]
-            | _ -> [(Bool true, AND(pi, LESSTHAN(v1, v2)))]
+            | _ -> [(LESSTHAN(v1, v2), AND(pi, LESSTHAN(v1, v2)))]
             )
           )
       )
@@ -161,7 +161,7 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
             | Bool _, _ | SBool _, _
             | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : LT")
             | Int n1, Int n2 -> [(Bool (n1 <= n2), pi)]
-            | _ -> [(Bool true, AND(pi, LESSEQUAL(v1, v2)))]
+            | _ -> [(LESSEQUAL(v1, v2), AND(pi, LESSEQUAL(v1, v2)))]
             )
           )
       )
@@ -174,7 +174,7 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
               | Bool _, _ | SBool _, _
               | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : LT")
               | Int n1, Int n2 -> [(Bool (n1 > n2), pi)]
-              | _ -> [(Bool true, AND(pi, GREATTHAN(v1, v2)))]
+              | _ -> [(GREATTHAN(v1, v2), AND(pi, GREATTHAN(v1, v2)))]
             )
           )
       )
@@ -187,7 +187,7 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
             | Bool _, _ | SBool _, _
             | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : LT")
             | Int n1, Int n2 -> [(Bool (n1 >= n2), pi)]
-            | _ -> [(Bool true, AND(pi, GREATEQUAL(v1, v2)))]
+            | _ -> [(GREATEQUAL(v1, v2), AND(pi, GREATEQUAL(v1, v2)))]
             )
           )
       )
@@ -210,17 +210,17 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
         (*| SArray n1 -> args_to_value tl body (append_env env (vName, SArray l))*)
         ) 
       ) in let env = args_to_value args env in 
-        let pre_exp = annotation_to_value pre env pi true in 
-        eval_exp_aux pre_exp (fun v pi ->
-          eval_exp body env pi pre post
-        )
+        let pre_exp = annotation_to_value pre env TRUE true in 
+          eval_exp_aux pre_exp (fun v pre_exp -> 
+            eval_exp body env (AND(pi, pre_exp)) pre post
+          )
 
   (* 차후 구현 *)
   | FOR (pre, x1, init, cond, x2, next, body, out) ->
     let post = pre in 
-    let pre_exp = annotation_to_value pre env pi (true) in
-      eval_exp_aux pre_exp (fun v pi ->
-        let init_exp = eval_exp init env pi pre post in
+    let pre_exp = annotation_to_value pre env TRUE (true) in
+      eval_exp_aux pre_exp (fun v pre_exp ->
+        let init_exp = eval_exp init env (AND(pi, pre_exp)) pre post in
         eval_exp_aux init_exp (fun v1 pi ->
           let env = append_env env (x1, v1) in
             let cond_exp = eval_exp cond env pi pre post in
@@ -230,10 +230,10 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
                 | SBool _ -> (let l1 = (eval_exp body env (AND(pi, EQ(v2, Bool true))) pre post) 
                               in eval_exp_aux l1 (fun v3 pi ->
                                 let env = append_env env (x2, v3) in
-                                let post_exp = annotation_to_value post env pi true in
-                                  eval_exp_aux post_exp (fun v pi ->
-                                    eval_exp out env pi pre post
-                                  )
+                                let post_exp = annotation_to_value post env TRUE true in
+                                    eval_exp_aux post_exp (fun v post_exp ->
+                                    eval_exp out env (AND(pi, post_exp)) pre post
+                                    )
                               ))@(eval_exp out env (AND(pi, EQ(v2, Bool false))) pre post)
                 | _ -> raise(Failure "Type Error : IF")
                 )
@@ -242,20 +242,25 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
       )
 
   | RETURN (b) ->
-    let l = annotation_to_value post env pi 
-      (match b with (* post condition은 not *)
-      | TRUE -> false
-      | FALSE -> true
-      )
-      in eval_exp_aux l (fun v pi -> 
-        eval_exp UNIT env pi pre post
+    let l1 = eval_exp b env pi pre post in
+      eval_exp_aux l1 (fun v pi ->
+        
+        let l2 = annotation_to_value post env TRUE
+        (match v with (* post condition은 not *)
+        | Bool true -> false
+        | Bool false -> true
+        | _ -> raise(Failure "What??")
+        )
+        in eval_exp_aux l2 (fun v post_exp -> 
+          eval_exp UNIT env (AND(pi, post_exp)) pre post
+        )
       )
     
 and annotation_to_value : exp list -> env -> path_cond -> bool -> (value * path_cond) list
 = fun logic env pi is_pre ->
   match logic with
   | [] -> if is_pre then [(Bool true, pi)] else [(Bool true, NOT pi)]
-  | hd::tl -> let l = eval_exp hd env pi [] [] in
-      eval_exp_aux l (fun v pi2 ->
+  | hd::tl -> let l1 = eval_exp hd env pi [] [] in
+      eval_exp_aux l1 (fun v pi2 ->
         annotation_to_value tl env (AND(pi, pi2)) is_pre
       )
