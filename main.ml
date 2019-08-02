@@ -18,11 +18,11 @@ let prog : exp -> unit
 
 let run : program -> unit
 = fun pgm ->
-  let rec print_aux : (value * path_cond) list -> int -> unit
+  let rec print_aux : (value * path_cond * env) list -> int -> unit
   = fun l cnt ->
     match l with
     | [] -> print_newline ()
-    | (v, pi)::tl ->
+    | (v, pi, _)::tl ->
             print_endline ("<" ^ string_of_int cnt ^ ">");
             print_endline ("path condition: " ^ cond2str (((*simplify_path*) (pi))));
             print_endline ("value: " ^ value2str ((*simplify_val*) (v)));
