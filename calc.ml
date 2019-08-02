@@ -26,8 +26,9 @@ type value =
   | Bool of bool
   (* symbol *)
   | SInt of id
-  | SBool of sym_exp
+  | SBool of id
   | SArith of arith_op * value * value
+  | Sum of value list
   | Return
 and arith_op = SADD
 and id = int
@@ -68,7 +69,7 @@ let rec value2str : value -> string
   | Int n -> string_of_int n
   | Bool b -> string_of_bool b
   | SInt id -> "alpha" ^ string_of_int id
-  | SBool exp -> cond2str(exp)
+  | SBool id -> "beta" ^ string_of_int id
   | SArith (aop, v1, v2) ->
     (match aop with
     | SADD -> "(" ^ value2str v1 ^ " + " ^ value2str v2 ^ ")"
@@ -84,7 +85,7 @@ and cond2str : sym_exp -> string
   | NOT e -> "!" ^ cond2str e
   | AND (e1, e2) -> "(" ^ cond2str e1 ^ " and " ^ cond2str e2 ^ ")"
   | OR (e1, e2) -> "(" ^ cond2str e1 ^ " or " ^ cond2str e2 ^ ")"
-  | EQ (v1, v2) -> "(" ^ value2str v1 ^ " = " ^ value2str v2 ^ ")"
+  | EQ (v1, v2) -> "(" ^ value2str v1 ^ " == " ^ value2str v2 ^ ")"
   | NOTEQ (v1, v2) -> "(" ^ value2str v1 ^ " != " ^ value2str v2 ^ ")"
   | LESSTHAN (v1, v2) -> "(" ^ value2str v1 ^ " < " ^ value2str v2 ^ ")"
   | LESSEQUAL (v1, v2) -> "(" ^ value2str v1 ^ " <= " ^ value2str v2 ^ ")"
@@ -116,11 +117,11 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
   | VAR v -> [(apply_env env v, pi)]
   | IF (cond, body1, body2, out) ->
     let l = eval_exp cond env pi pre post in
-      eval_exp_aux l (fun v pi ->
+      eval_exp_aux l (fun v pi2 ->
         (match v with
-        | Bool b -> eval_exp (if b then body1 else body2) env pi pre post
-        | SBool b -> let l2 = (eval_exp body1 env (AND(pi, EQ(v, b))) pre post)@
-                              (eval_exp body2 env (AND(pi, NOT(EQ(v, b)))) pre post)
+        | Bool b -> let AND(_, comp) = pi2
+                    in let l2 = (eval_exp body1 env (AND(pi, comp)) pre post)@
+                              (eval_exp body2 env (AND(pi, NOT (comp))) pre post)
                     in eval_exp_aux l2 (fun v pi -> eval_exp out env pi pre post)
         | _ -> raise(Failure "Type Error : IF")
         )
@@ -148,7 +149,7 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
             | Bool _, _ | SBool _, _
             | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : LT")
             | Int n1, Int n2 -> [(Bool (n1 < n2), pi)]
-            | _ -> [(LESSTHAN(v1, v2), AND(pi, LESSTHAN(v1, v2)))]
+            | _ -> [(Bool true, AND(pi, LESSTHAN(v1, v2)))]
             )
           )
       )
@@ -161,7 +162,7 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
             | Bool _, _ | SBool _, _
             | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : LT")
             | Int n1, Int n2 -> [(Bool (n1 <= n2), pi)]
-            | _ -> [(LESSEQUAL(v1, v2), AND(pi, LESSEQUAL(v1, v2)))]
+            | _ -> [(Bool true, AND(pi, LESSEQUAL(v1, v2)))]
             )
           )
       )
@@ -174,7 +175,7 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
               | Bool _, _ | SBool _, _
               | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : LT")
               | Int n1, Int n2 -> [(Bool (n1 > n2), pi)]
-              | _ -> [(GREATTHAN(v1, v2), AND(pi, GREATTHAN(v1, v2)))]
+              | _ -> [(Bool true, AND(pi, GREATTHAN(v1, v2)))]
             )
           )
       )
@@ -187,7 +188,7 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
             | Bool _, _ | SBool _, _
             | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : LT")
             | Int n1, Int n2 -> [(Bool (n1 >= n2), pi)]
-            | _ -> [(GREATEQUAL(v1, v2), AND(pi, GREATEQUAL(v1, v2)))]
+            | _ -> [(Bool true, AND(pi, GREATEQUAL(v1, v2)))]
             )
           )
       )

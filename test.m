@@ -1,7 +1,11 @@
 @ x<y @ x>=y test (int x int y) 
 { 
-@x<y for (int i:=i; i<3; i:=i+1) {
+
+if(x>y) {
     return true;
+} else {
+    return false;
 }
-return false;
+
+()
 }
