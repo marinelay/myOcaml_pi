@@ -53,6 +53,7 @@ rule start = parse
   | "=" { EQUAL }
   | ":=" { COLEQ }
   | ";" { SEMI }
+  | "," { COMMA }
   | eof { EOF }
   | _ { raise LexicalError }
 

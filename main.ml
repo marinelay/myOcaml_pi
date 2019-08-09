@@ -28,7 +28,7 @@ let run : program -> unit
             print_endline ("value: " ^ value2str ((*simplify_val*) (v)));
             print_newline ();
             print_aux tl (cnt + 1)
-    in let r = eval_exp pgm empty_env TRUE [] [] in print_aux r 1
+    in let r = eval_exp pgm empty_env TRUE [] [] in print_aux !empty_algo 1
     
 
 let main () =
