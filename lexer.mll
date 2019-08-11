@@ -22,6 +22,7 @@
     ; ("return", RETURN)
     ; ("and", AND_S)
     ; ("for", FOR)
+    ; ("FOR", FOR)
   ]
 }
 

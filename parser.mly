@@ -35,10 +35,9 @@
 %left AND OR
 %left AND_S
 %left SEMI
-%right AT
 
-%nonassoc FOR
-%nonassoc ELSE
+%left FOR
+
 
 %start program
 %type <Calc.program> program
@@ -70,6 +69,7 @@ exp:
   | NUM { Calc.INT $1 }
   | bool { $1 }
   | ID { Calc.VAR $1 }
+  | ID LBLOCK exp RBLOCK { Calc.ARR ($1, $3)}
   | LPAREN exp RPAREN { $2 }
   | exp PLUS exp { Calc.ADD ($1, $3) }
   | compare {$1}
@@ -87,7 +87,7 @@ typ:
 
 assign:
   | var_typ ID COLEQ exp { Calc.ASSIGN ($2, $4) }
-  | var_typ ID LBLOCK ID RBLOCK COLEQ exp { Calc.ASSIGN_ARR ($2, $4, $6) }
+  | var_typ ID LBLOCK exp RBLOCK COLEQ exp { Calc.ASSIGN_ARR ($2, $4, $7) }
 
 inits:
   | inits init { $1@[$2] }
@@ -95,7 +95,7 @@ inits:
 
 init:
   | typ ID { Calc.VAR( $2 ) }
-  | typ ID LBLOCK RBLOCK { Calc.ARR( $2 ) }
+  | typ ID LBLOCK RBLOCK { Calc.ARR( $2, Calc.UNIT ) }
 
 pre_conds:
   | pre_conds AND_S compare { $1@[$3] }

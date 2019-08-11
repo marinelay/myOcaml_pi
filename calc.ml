@@ -30,8 +30,10 @@ type value =
   (* symbol *)
   | SInt of id
   | SBool of id
-  | SArr of var * value * value
+  | SArr of value * value list (* list is SIndex *)
+  | SIndex of value * value * value (* SArr , index , value *)
   | SArith of arith_op * value * value
+  | None (* For array empty *)
   | Sum of value list
   | Return
 and arith_op = SADD
@@ -75,16 +77,26 @@ let rec apply_env env x =
   | [] -> raise(Failure "None in env")
   | (y, v)::tl -> if y=x then v else apply_env tl x
 
-let rec apply_arr env x i =
+let rec append_arr : (var * value) list -> (var * value * value) -> (var * value) list = fun env (x, i, v) ->
+let SArr (id, l) = apply_env env x
+in (x, SArr(id, (SIndex(id, i, v))::l))::env
+
+let rec apply_arr : (var * value) list -> var -> value -> value = fun env x i ->
   match env with
-  | [] -> raise(Failure "None in env_arr")
+  | [] -> raise(Failure "None in arr first")
   | (y, v)::tl -> if y=x then
-      (let rec find_index arr i =
-      (match arr with
-      | [] -> raise(Failure "None in arr")
-      | (j, w)::tl -> if j=i then w else find_index tl i 
-      ) in find_index v i)
+      let SArr (id, l) = v in
+      let rec find_index : value list -> value -> value = fun l i ->
+      (match l with
+      | [] -> None
+      | hd::tl ->  
+        (match hd with
+        | SIndex (id, j, w) -> if j=i then hd else find_index tl i
+        )
+      ) in find_index l i
       else apply_arr tl x i
+
+
 
 let rec value2str : value -> string
 = fun v ->
@@ -94,6 +106,7 @@ let rec value2str : value -> string
   | Bool b -> string_of_bool b
   | SInt id -> "alpha" ^ string_of_int id
   | SBool id -> "beta" ^ string_of_int id
+  | SIndex (id, v1, v2) -> value2str id ^ "[" ^ value2str v1 ^ "] = " ^ value2str v2 
   | SArith (aop, v1, v2) ->
     (match aop with
     | SADD -> "(" ^ value2str v1 ^ " + " ^ value2str v2 ^ ")"
@@ -120,7 +133,7 @@ and cond2str : sym_exp -> string
   (*
   * if문을 예로 들면, condition을 받았다고 해보자
   * condition을 eval_exp하면 (value * path_cond) list가 나올테고
-  * list 원소들의 value를 뽑아내야 하므로 eval_exp_aux를 통해
+  * list 원소들의 value, path_cond를 뽑아내야 하므로 eval_exp_aux를 통해
   * value와 path_cond을 뽑아내는 것이다
   *)
 let rec eval_exp_aux : (value * path_cond * env) list -> (value -> path_cond -> env -> (value * path_cond * env) list) -> (value * path_cond * env) list
@@ -139,7 +152,16 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
   | TRUE -> [(Bool true, pi, env)]
   | FALSE -> [(Bool false, pi, env)]
   | VAR v -> [(apply_env env v, pi, env)]
-  | ARR (v, i) -> [(apply_arr env v i, pi, env)]
+  | ARR (x, i) -> 
+    let l = eval_exp i env pi pre post in
+    eval_exp_aux l (fun w pi env ->
+      let v = apply_arr env x w in
+      (match v with
+      | None -> let n = new_sym () in let env = append_arr env (x, w, SInt n) in [(apply_arr env x w, pi, env)]
+      | _ -> [(apply_arr env x w, pi, env)]
+      )
+    )
+  
   | IF (cond, body1, body2) ->
     let l = eval_exp cond env pi pre post in
       eval_exp_aux l (fun v pi1 env ->
@@ -242,19 +264,18 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
   | ASSIGN (x, e1) ->
     let l1 = eval_exp e1 env pi pre post in
     eval_exp_aux l1 (fun v pi env ->
+    
       [(v, pi, (append_env env (x, v)))]
     )
 
   | ASSIGN_ARR (x, i, e1) ->
+  
     let l1 = eval_exp i env pi pre post in
     let l2 = eval_exp e1 env pi pre post in
     eval_exp_aux l1 (fun v1 pi env -> 
     eval_exp_aux l2 (fun v2 pi env ->
-      let l1 = apply_env env x in
-      (match l1 with
-      | SArr arr -> [(Unit, pi, (append_env env (x, SArr ((v1,v2)::arr))))]
-      | _ -> raise(Failure "Can't Assign...")
-      )
+      
+      [(Unit, pi, (append_arr env (x, v1, v2)))]
     )
     )
 
@@ -270,9 +291,9 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
                     let l = new_sym () in
                     args_to_value tl (append_env env (n, SInt l))
         (* Add arr *)
-        | ARR n -> let _ = append_args [n] in
+        | ARR (n, _) -> let _ = append_args [n] in
                     let l = new_sym () in
-                    args_to_value tl (append_env env (n, SArr([])))
+                    args_to_value tl (append_env env (n, SArr(SInt l, [])))
         )
       ) in let env = args_to_value args env in 
         let pre_exp = annotation_to_value pre env TRUE true in 
@@ -328,7 +349,7 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
 
   (* 배열 추가 필요 *)
   | RETURN_FUNC (args) ->
-    let rec args_to_value : exp list -> exp list -> env -> env
+    let rec args_to_value : exp list -> string list -> env -> env
     = fun args_value args_name env ->
       (match args_value with
       | [] -> env (* complete assign args *)
@@ -339,7 +360,7 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
                     | hd_name::tl_name -> args_to_value tl_val tl_name (append_env env (hd_name, v)) 
                     )
                     
-      ) in let env = args_to_value args !func_args env in
+      ) in let env = args_to_value args (!func_args) env in
         let post_exp = annotation_to_value post env TRUE true in
         eval_exp_aux post_exp (fun v pi_post env_post ->
           let _ = append_algo [(Return, AND(pi, pi_post), env)] in
