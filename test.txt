@@ -1,5 +1,0 @@
-@true
-@x>10
-test (int x) {
- ()
-}

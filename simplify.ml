@@ -16,4 +16,4 @@ let rec list_simplify : (value * path_cond * env) list -> (value * path_cond * e
 = fun l ->
   match l with
   | [] -> []
-  | (v, p, e)::tl -> print_endline(cond2str(p)); (simplify_val (v), simplify_path (p), e)::(list_simplify tl)
+  | (v, p, e)::tl -> (simplify_val (v), simplify_path (p), e)::(list_simplify tl)

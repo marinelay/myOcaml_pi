@@ -22,9 +22,9 @@ let const_n ctx n = Z3.Expr.mk_numeral_int ctx n (int_sort ctx)
 let const_str ctx str = mk_const ctx str (string_sort ctx)
 let const_b ctx b = Z3.Boolean.mk_val ctx b
 (* var Array *)
-let balance ctx str sort = Z3.Expr.mk_const_s ctx str sort (* mk_const랑 동일... *)
-let balance_lower ctx arr_expr target_expr = Z3.Z3Array.mk_select ctx arr_expr target_expr
-let balance_upper ctx arr_expr target_expr = Z3.Z3Array.mk_select ctx arr_expr target_expr
+let arr_n ctx str sort = Z3.Expr.mk_const_s ctx str sort (* mk_const랑 동일... *)
+let arr_select ctx arr_n i = Z3.Z3Array.mk_select ctx arr_n i
+let arr_store ctx arr_n i v = Z3.Z3Array.mk_store ctx arr_n i v  
 
 (* aop *)
 let add ctx expr1 expr2 = Z3.Arithmetic.mk_add ctx [expr1; expr2]
@@ -44,6 +44,8 @@ let not_b ctx expr = Z3.Boolean.mk_not ctx expr
 let eq ctx expr1 expr2 = Z3.Boolean.mk_eq ctx expr1 expr2
 let neq ctx expr1 expr2 = (not_b ctx (eq ctx expr1 expr2))
 
+let quan quant = Z3.Quantifier.expr_of_quantifier quant
+
 exception NotComputableValue
 
 let rec val2expr_aux : context -> value -> Expr.expr
@@ -58,7 +60,9 @@ let rec val2expr_aux : context -> value -> Expr.expr
     | SADD -> add ctx (val2expr_aux ctx v1) (val2expr_aux ctx v2)
     )
   | SIndex (id, v1, v2) ->
-    eq ctx (balance ctx ("array_" ^ string_of_int id ^ "[" ^ value2str v1 ^ "]") (arr_sort ctx)) (val2expr_aux ctx v2)
+      let arr = arr_n ctx ("array_" ^ string_of_int id) (arr_sort ctx) in
+      let arr = arr_store ctx arr (val2expr_aux ctx v1) (val2expr_aux ctx v2) in
+      arr_select ctx arr (val2expr_aux ctx v1)
   | Sum l ->
     (
     match l with
@@ -120,6 +124,12 @@ let rec path2expr_aux : context -> path_cond -> Expr.expr
   | LESSEQUAL (p1, p2) -> le ctx (val2expr_aux ctx p1) (val2expr_aux ctx p2)
   | GREATTHAN (p1, p2) -> gt ctx (val2expr_aux ctx p1) (val2expr_aux ctx p2)
   | GREATEQUAL (p1, p2) -> ge ctx (val2expr_aux ctx p1) (val2expr_aux ctx p2)
+
+  | QUAN_EXIST (p1, body) -> 
+  quan (Z3.Quantifier.mk_exists_const ctx [(val2expr_aux ctx p1)] (path2expr_aux ctx body) None [] [] None None)
+
+  | QUAN_ALL (p1, body) -> 
+  quan (Z3.Quantifier.mk_forall_const ctx [(val2expr_aux ctx p1)] (path2expr_aux ctx body) None [] [] None None)
 
 let path2expr : path_cond -> Expr.expr
 = fun p -> path2expr_aux (new_ctx ()) p

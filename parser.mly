@@ -29,11 +29,13 @@
 %token AND_S
 %token COMMA
 
+%token EXIST, FORALL
+%token DOT
+
 
 %left PLUS MINUS
 %left STAR SLASH
-%left AND OR
-%left AND_S
+
 %left SEMI
 
 %left FOR
@@ -98,11 +100,18 @@ init:
   | typ ID LBLOCK RBLOCK { Calc.ARR( $2, Calc.UNIT ) }
 
 pre_conds:
-  | pre_conds AND_S compare { $1@[$3] }
-  | compare { [$1] }
+  | pre_conds AND_S pre_cond { $1@[$3] }
+  | pre_cond { [$1] }
+  
+
+pre_cond:
+  | compare { $1 }
+  | EXIST ID DOT LPAREN pre_conds RPAREN { Calc.EXIST($2, $5) }
+  | FORALL ID DOT LPAREN pre_conds RPAREN { Calc.FORALL($2, $5) }
 
 compare:
   | bool { $1 }
+  | exp EQUAL exp { Calc.EQUAL ($1, $3) }
   | exp LT exp { Calc.LT ($1, $3) }
   | exp LE exp { Calc.LE ($1, $3) }
   | exp GT exp { Calc.GT ($1, $3) }

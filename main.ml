@@ -8,11 +8,11 @@ let prog : program -> unit
 = fun p1 ->
   let _ = init_sym_cnt () in 
   let r1 = eval_exp p1 empty_env TRUE [] [] in
-  let rv1 = list_simplify !empty_algo in
+  (*let rv1 = list_simplify !empty_algo in*)
   let ctx = Z3_translator.new_ctx () in
   let solver = Z3.Solver.mk_solver ctx None in
 
-  match Solve.solve ctx solver rv1 with
+  match Solve.solve ctx solver !empty_algo with
   | true -> print_endline ("Correct")
   | false -> print_endline ("Fail") 
 
@@ -24,8 +24,8 @@ let run : program -> unit
     | [] -> print_newline ()
     | (v, pi, _)::tl ->
             print_endline ("<" ^ string_of_int cnt ^ ">");
-            print_endline ("path condition: " ^ cond2str ((simplify_path (pi))));
-            print_endline ("value: " ^ value2str (simplify_val (v)));
+            print_endline ("path condition: " ^ cond2str (((*simplify_path*) (pi))));
+            print_endline ("value: " ^ value2str ((*simplify_val*) (v)));
             print_newline ();
             print_aux tl (cnt + 1)
     in let r = eval_exp pgm empty_env TRUE [] [] in print_aux !empty_algo 1

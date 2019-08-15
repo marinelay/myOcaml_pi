@@ -23,6 +23,10 @@
     ; ("and", AND_S)
     ; ("for", FOR)
     ; ("FOR", FOR)
+    ; ("exist", EXIST)
+    ; ("EXIST", EXIST)
+    ; ("forall", FORALL)
+    ; ("FORALL", FORALL)
   ]
 }
 
@@ -55,6 +59,7 @@ rule start = parse
   | ":=" { COLEQ }
   | ";" { SEMI }
   | "," { COMMA }
+  | "." { DOT }
   | eof { EOF }
   | _ { raise LexicalError }
 

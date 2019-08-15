@@ -9,6 +9,7 @@ and exp =
   | ARR of var * exp
   | IF of exp * exp * exp
   | ADD of exp * exp
+  | EQUAL of exp * exp
   | LT of exp * exp
   | LE of exp * exp
   | GT of exp * exp
@@ -20,6 +21,9 @@ and exp =
   | FOR of exp list * exp * exp * exp * exp
   | RETURN of exp
   | RETURN_FUNC of exp list
+
+  | EXIST of var * exp list
+  | FORALL of var * exp list
 and var = string
 ;;
 
@@ -36,6 +40,8 @@ type value =
   | None (* For array empty *)
   | Sum of value list
   | Return
+
+
 and arith_op = SADD
 and id = int
 and env = (var * value) list
@@ -54,6 +60,9 @@ and sym_exp =
   | GREATEQUAL of value * value
   | ANDL of sym_exp list
   | ORL of sym_exp list
+
+  | QUAN_ALL of value * sym_exp
+  | QUAN_EXIST of value * sym_exp
 and path_cond = sym_exp
 
 let func_args = ref []
@@ -106,13 +115,14 @@ let rec value2str : value -> string
   | Bool b -> string_of_bool b
   | SInt id -> "alpha" ^ string_of_int id
   | SBool id -> "beta" ^ string_of_int id
-  | SIndex (id, v1, v2) -> string_of_int id ^ "[" ^ value2str v1 ^ "] = " ^ value2str v2 
+  | SIndex (id, v1, v2) -> "array" ^ string_of_int id ^ "[" ^ value2str v1 ^ "] is " ^ value2str v2 
   | SArith (aop, v1, v2) ->
     (match aop with
     | SADD -> "(" ^ value2str v1 ^ " + " ^ value2str v2 ^ ")"
     )
   | Sum l -> "(" ^ fold (fun v1 s2 -> value2str v1 ^ (if s2 = ")" then "" else " + ") ^ s2) l ")"
   | Return -> "output"
+  | None -> "none"
 
 and cond2str : sym_exp -> string
 = fun pi ->
@@ -128,6 +138,9 @@ and cond2str : sym_exp -> string
   | LESSEQUAL (v1, v2) -> "(" ^ value2str v1 ^ " <= " ^ value2str v2 ^ ")"
   | GREATTHAN (v1, v2) -> "(" ^ value2str v1 ^ " > " ^ value2str v2 ^ ")"
   | GREATEQUAL (v1, v2) -> "(" ^ value2str v1 ^ " >= " ^ value2str v2 ^ ")"
+
+  | QUAN_EXIST (v1, e) -> "(There Exist " ^ value2str v1 ^ " s.t. " ^ cond2str e ^ ")"
+  | QUAN_ALL (v1, e) -> "(For All " ^ value2str v1 ^ " s.t. " ^ cond2str e ^ ")"
 
   (* 타입 맞춰주기 *)
   (*
@@ -155,6 +168,7 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
   | ARR (x, i) -> 
     let l = eval_exp i env pi pre post in
     eval_exp_aux l (fun w pi env ->
+
       let v = apply_arr env x w in
       (match v with
       | None -> let n = new_sym () in let env = append_arr env (x, w, SInt n) in [(apply_arr env x w, pi, env)]
@@ -186,9 +200,9 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
       )
   | ADD (e1, e2) ->
     let l1 = eval_exp e1 env pi pre post in
-      eval_exp_aux l1 (fun v1 pi1 env1 ->
+      eval_exp_aux l1 (fun v1 pi1 env ->
         let l2 = eval_exp e2 env pi pre post in
-          eval_exp_aux l2 (fun v2 pi2 env2 ->
+          eval_exp_aux l2 (fun v2 pi2 env ->
             (match (v1,v2) with
             | Bool _, _ | SBool _, _
             | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : ADD")
@@ -198,11 +212,26 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
           )
       )
 
-  | LT ( e1, e2) ->
+  | EQUAL (e1, e2) ->
     let l1 = eval_exp e1 env pi pre post in
-      eval_exp_aux l1 (fun v1 pi1 env1 ->
+      eval_exp_aux l1 (fun v1 pi1 env ->
         let l2 = eval_exp e2 env pi pre post in
-          eval_exp_aux l2 (fun v2 pi2 env2 ->
+          eval_exp_aux l2 (fun v2 pi2 env ->
+
+            (match (v1, v2) with
+            | Bool _, _ | SBool _, _
+            | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : LT")
+            | Int n1, Int n2 -> [(Bool (n1 < n2), pi, env)]
+            | _ -> [(Bool true, AND(pi, EQ(v1, v2)), env)]
+            )
+          )
+      )
+
+  | LT (e1, e2) ->
+    let l1 = eval_exp e1 env pi pre post in
+      eval_exp_aux l1 (fun v1 pi1 env ->
+        let l2 = eval_exp e2 env pi pre post in
+          eval_exp_aux l2 (fun v2 pi2 env ->
 
             (match (v1, v2) with
             | Bool _, _ | SBool _, _
@@ -214,9 +243,9 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
       )
   | LE (e1, e2) ->
     let l1 = eval_exp e1 env pi pre post in
-      eval_exp_aux l1 (fun v1 pi1 env1 ->
+      eval_exp_aux l1 (fun v1 pi1 env ->
         let l2 = eval_exp e2 env pi pre post in
-          eval_exp_aux l2 (fun v2 pi2 env2 ->
+          eval_exp_aux l2 (fun v2 pi2 env ->
             (match (v1, v2) with
             | Bool _, _ | SBool _, _
             | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : LE")
@@ -227,9 +256,9 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
       )
   | GT (e1, e2) ->
     let l1 = eval_exp e1 env pi pre post in
-      eval_exp_aux l1 (fun v1 pi1 env1 ->
+      eval_exp_aux l1 (fun v1 pi1 env ->
         let l2 = eval_exp e2 env pi pre post in
-          eval_exp_aux l2 (fun v2 pi2 env2 ->
+          eval_exp_aux l2 (fun v2 pi2 env ->
             (match (v1, v2) with
               | Bool _, _ | SBool _, _
               | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : GT")
@@ -240,9 +269,9 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
       )
   | GE (e1, e2) ->
     let l1 = eval_exp e1 env pi pre post in
-      eval_exp_aux l1 (fun v1 pi1 env1 ->
+      eval_exp_aux l1 (fun v1 pi1 env ->
         let l2 = eval_exp e2 env pi pre post in
-          eval_exp_aux l2 (fun v2 pi2 env2 ->
+          eval_exp_aux l2 (fun v2 pi2 env ->
             (match (v1, v2) with
             | Bool _, _ | SBool _, _
             | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : GE")
@@ -264,8 +293,11 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
   | ASSIGN (x, e1) ->
     let l1 = eval_exp e1 env pi pre post in
     eval_exp_aux l1 (fun v pi env ->
-    
-      [(v, pi, (append_env env (x, v)))]
+      (match v with
+      | SIndex (id, i, w) -> [(w, pi, (append_env env (x, w)))]
+      | _ -> [(v, pi, (append_env env (x, v)))]
+      )
+      
     )
 
   | ASSIGN_ARR (x, i, e1) ->
@@ -274,8 +306,10 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
     let l2 = eval_exp e1 env pi pre post in
     eval_exp_aux l1 (fun v1 pi env -> 
     eval_exp_aux l2 (fun v2 pi env ->
-      
-      [(Unit, pi, (append_arr env (x, v1, v2)))]
+      (match v2 with
+      | SIndex (id, i, w) -> [(w, pi, (append_arr env (x, v1, w)))]
+      | _ -> [(v2, pi, (append_arr env (x, v1, v2)))]
+      )
     )
     )
 
@@ -347,7 +381,6 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
         )
       )
 
-  (* 배열 추가 필요 *)
   | RETURN_FUNC (args) ->
     let rec args_to_value : exp list -> string list -> env -> env
     = fun args_value args_name env ->
@@ -365,7 +398,40 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
         eval_exp_aux post_exp (fun v pi_post env_post ->
           let _ = append_algo [(Return, AND(pi, pi_post), env)] in
           eval_exp UNIT env TRUE pre post
-        ) 
+        )
+
+  | FORALL (v, conds) ->
+    let num = new_sym () in let env = append_env env (v, SInt num) in
+    let rec conds_to_value : exp list -> env -> path_cond -> (value * path_cond * env) list
+    = fun conds env pi ->
+      (match conds with
+      | [] -> [(Bool true, pi, env)]
+      | hd::tl ->
+        let l1 = eval_exp hd env pi [] [] in
+        eval_exp_aux l1 (fun w pi2 env ->
+          [(Bool true, AND(pi, pi2), env)]
+        )
+      ) in let body = conds_to_value conds env TRUE in
+        eval_exp_aux body (fun w pi2 env ->
+          [(Bool true, AND(pi, QUAN_ALL(apply_env env v, pi2)), env)]
+        )
+        
+
+  | EXIST (v, conds) ->
+    let num = new_sym() in let env = append_env env (v, SInt num) in
+    let rec conds_to_value : exp list -> env -> path_cond -> (value * path_cond * env) list
+    = fun conds env pi ->
+      (match conds with
+      | [] -> [(Bool true, pi, env)]
+      | hd::tl ->
+        let l1 = eval_exp hd env pi [] [] in
+        eval_exp_aux l1 (fun w pi2 env ->
+          [(Bool true, AND(pi, pi2), env)]
+        )
+      ) in let body = conds_to_value conds env TRUE in
+      eval_exp_aux body (fun w pi2 env ->
+        [(Bool true, AND(pi, QUAN_EXIST(apply_env env v, pi2)), env)]
+      )
 
     
 and annotation_to_value : exp list -> env -> path_cond -> bool -> (value * path_cond * env) list

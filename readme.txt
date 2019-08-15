@@ -1,0 +1,1 @@
+export LD_LIBRARY_PATH=`opam config var z3:lib`
