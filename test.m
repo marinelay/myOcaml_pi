@@ -1,7 +1,7 @@
-@ x>y @ x>=y test (int x int y) 
+@ x>=y @ x>=y test (int x int y) 
 { 
 
-if(x>y) {
+if(x>=y) {
     return true;
 } else {
     return false;

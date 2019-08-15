@@ -1,1 +1,2 @@
 true: package(str)
+true: package(z3)

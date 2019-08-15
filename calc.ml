@@ -30,8 +30,8 @@ type value =
   (* symbol *)
   | SInt of id
   | SBool of id
-  | SArr of value * value list (* list is SIndex *)
-  | SIndex of value * value * value (* SArr , index , value *)
+  | SArr of id * value list (* list is SIndex *)
+  | SIndex of id * value * value (* SArr , index , value *)
   | SArith of arith_op * value * value
   | None (* For array empty *)
   | Sum of value list
@@ -106,7 +106,7 @@ let rec value2str : value -> string
   | Bool b -> string_of_bool b
   | SInt id -> "alpha" ^ string_of_int id
   | SBool id -> "beta" ^ string_of_int id
-  | SIndex (id, v1, v2) -> value2str id ^ "[" ^ value2str v1 ^ "] = " ^ value2str v2 
+  | SIndex (id, v1, v2) -> string_of_int id ^ "[" ^ value2str v1 ^ "] = " ^ value2str v2 
   | SArith (aop, v1, v2) ->
     (match aop with
     | SADD -> "(" ^ value2str v1 ^ " + " ^ value2str v2 ^ ")"
@@ -293,7 +293,7 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
         (* Add arr *)
         | ARR (n, _) -> let _ = append_args [n] in
                     let l = new_sym () in
-                    args_to_value tl (append_env env (n, SArr(SInt l, [])))
+                    args_to_value tl (append_env env (n, SArr(l, [])))
         )
       ) in let env = args_to_value args env in 
         let pre_exp = annotation_to_value pre env TRUE true in 

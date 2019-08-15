@@ -58,7 +58,7 @@ let rec val2expr_aux : context -> value -> Expr.expr
     | SADD -> add ctx (val2expr_aux ctx v1) (val2expr_aux ctx v2)
     )
   | SIndex (id, v1, v2) ->
-    eq ctx (balance ctx ("array_" ^ string_of_int id ^ "[" ^ val2expr_aux v1 ^ "]") (arr_sort ctx)) (val2expr_aux ctx v2)
+    eq ctx (balance ctx ("array_" ^ string_of_int id ^ "[" ^ value2str v1 ^ "]") (arr_sort ctx)) (val2expr_aux ctx v2)
   | Sum l ->
     (
     match l with
