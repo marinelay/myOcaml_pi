@@ -24,8 +24,8 @@ let run : program -> unit
     | [] -> print_newline ()
     | (v, pi, _)::tl ->
             print_endline ("<" ^ string_of_int cnt ^ ">");
-            print_endline ("path condition: " ^ cond2str (((*simplify_path*) (pi))));
-            print_endline ("value: " ^ value2str ((*simplify_val*) (v)));
+            print_endline ("path condition: " ^ cond2str ((simplify_path (pi))));
+            print_endline ("value: " ^ value2str (simplify_val (v)));
             print_newline ();
             print_aux tl (cnt + 1)
     in let r = eval_exp pgm empty_env TRUE [] [] in print_aux !empty_algo 1

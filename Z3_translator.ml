@@ -75,6 +75,12 @@ let val2expr : value -> Expr.expr
 
 let rec expr2val : Expr.expr -> value
 = fun expr -> 
+  if AST.is_var (Expr.ast_of_expr expr) (* quantifier *)
+  then 
+    let test = Quantifier.get_index expr in 
+    print_endline(string_of_int test);
+    
+  else
   let op = FuncDecl.get_decl_kind (Expr.get_func_decl expr) in
   match op with
   | OP_ANUM -> (* int *)
@@ -110,6 +116,7 @@ let rec expr2val : Expr.expr -> value
       else (* Expr.get_num_args < 2 *) raise (Failure "SHOULD NOT COME HERE")
     end
 
+
 let rec path2expr_aux : context -> path_cond -> Expr.expr
 = fun ctx p ->
   match p with
@@ -136,6 +143,37 @@ let path2expr : path_cond -> Expr.expr
 
 let rec expr2path : Expr.expr -> path_cond
 = fun expr ->
+print_endline("path : " ^ Expr.to_string expr);
+  let is_quantifier = AST.get_ast_kind (Expr.ast_of_expr expr) in
+  match is_quantifier with
+  | QUANTIFIER_AST ->
+    let quant = Quantifier.quantifier_of_expr expr in
+    let hd::tl = Quantifier.get_bound_variable_names quant in(* 리스트 처리를 안해서 임의로 이렇게... *)
+    let str = Symbol.get_string hd in
+    print_endline(str);
+    let get_name = (let l = Str.split (Str.regexp "_") str in
+    match l with
+    | [hd; tl] ->
+      if hd = "alpha" then SInt (int_of_string tl)
+      else if hd = "beta" then SBool (int_of_string tl)
+      else raise (Failure "SHOULD NOT COME HERE")
+    | _ -> raise (Failure "SHOULD NOT COME HERE")
+    ) in 
+    let body = Quantifier.get_body quant in
+
+    let hd::tl = Expr.get_args body in
+
+    print_endline(Expr.to_string(hd));
+    print_endline(string_of_int (Quantifier.get_num_no_patterns quant))  ;  
+    if Quantifier.is_universal quant
+    then (* forall *)
+      QUAN_ALL(get_name, expr2path body)
+    else (* exist *)
+      QUAN_EXIST(get_name, expr2path body)
+  | _ ->
+  begin
+  
+ 
   let op = FuncDecl.get_decl_kind (Expr.get_func_decl expr) in
   match op with
   | OP_TRUE -> TRUE
@@ -164,11 +202,13 @@ let rec expr2path : Expr.expr -> path_cond
     end
   | OP_EQ -> (* equal *) let [hd; tl] = Expr.get_args expr in EQ (expr2val hd, expr2val tl)
   | OP_NOT -> let [e] = Expr.get_args expr in NOT (expr2path e)
-  | OP_LE -> let [hd; tl] = Expr.get_args expr in LESSEQUAL (expr2val hd, expr2val tl)
+  | OP_LE -> print_endline("!!"); let [hd; tl] = Expr.get_args expr in LESSEQUAL (expr2val hd, expr2val tl)
   | OP_GE -> let [hd; tl] = Expr.get_args expr in GREATEQUAL (expr2val hd, expr2val tl)
   | OP_LT -> let [hd; tl] = Expr.get_args expr in LESSTHAN (expr2val hd, expr2val tl)
   | OP_GT -> let [hd; tl] = Expr.get_args expr in GREATTHAN (expr2val hd, expr2val tl)
+
   | _ -> raise (Failure "expr2path: Not Implemented")
+  end
 
 let funcdecl2val : FuncDecl.func_decl -> value
 = fun f ->
