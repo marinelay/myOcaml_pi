@@ -50,17 +50,17 @@ type bound_env = Z3.Symbol.symbol list
 
 let empty_bound = []
 let rec append_bound l bound_env
-= let tmp = 
+= let rec get_symbol l = 
   (match l with
   | [] -> []
-  | hd::tl -> (append_env tl bound_env)@[hd] 
-  ) in tmp@bound_env
+  | hd::tl -> hd::(get_symbol tl)
+  ) in bound_env@(get_symbol l)
 
 let rec find_bound n bound_env 
 = match bound_env with
   | [] -> raise(Failure "No bound var..")
   | hd::tl ->
-    if n > 0 then find_bound (n-1) bound_env else hd
+    if n > 0 then find_bound (n-1) tl else hd
 
 exception NotComputableValue
 
@@ -91,11 +91,10 @@ let val2expr : value -> Expr.expr
 
 let rec expr2val : Expr.expr -> bound_env -> value
 = fun expr env -> 
-  print_endline("num : " ^ string_of_int (Expr.get_num_args expr));
-
   if AST.is_var (Expr.ast_of_expr expr) (* quantifier *)
   then 
     let num = Quantifier.get_index expr in 
+    print_endline(Expr.to_string expr ^ " : " ^ string_of_int num);
     let get_symbol = find_bound num env in
     let str = Symbol.get_string get_symbol in
     let l = Str.split (Str.regexp "_") str in
@@ -216,14 +215,25 @@ let path2expr : path_cond -> Expr.expr
 
 let rec expr2path : Expr.expr -> bound_env -> path_cond
 = fun expr env ->
-print_endline("path : " ^ Expr.to_string expr);
   let is_quantifier = AST.get_ast_kind (Expr.ast_of_expr expr) in
   match is_quantifier with
   | QUANTIFIER_AST ->
     let quant = Quantifier.quantifier_of_expr expr in
     let name_list = Quantifier.get_bound_variable_names quant in
     let env = append_bound name_list env in
+    let body = Quantifier.get_body quant in
 
+    let hd::tl = name_list in 
+    let str = Symbol.get_string hd in
+    let l = Str.split (Str.regexp "_") str in
+    let get_name = 
+    (match l with
+    | [hd; tl] ->
+      if hd = "alpha" then SInt (int_of_string tl)
+      else if hd = "beta" then SBool (int_of_string tl)
+      else raise (Failure "SHOULD NOT COME HERE")
+    | _ -> raise (Failure "SHOULD NOT COME HERE")
+    ) in
     if Quantifier.is_universal quant
     then (* forall *)
       QUAN_ALL(get_name, expr2path body env)
@@ -246,7 +256,7 @@ print_endline("path : " ^ Expr.to_string expr);
       end
       else if n > 2 then
       begin
-        let l = Expr.get_args expr in ANDL (map expr2path l)
+        let l = Expr.get_args expr in ANDL (map_env expr2path l env)
       end
       else (* Expr.get_num_args < 2 *) raise (Failure "SHOULD NOT COME HERE")
     end
@@ -256,7 +266,7 @@ print_endline("path : " ^ Expr.to_string expr);
       if n = 2 then
         let [hd; tl] = Expr.get_args expr in OR (expr2path hd env, expr2path tl env)
       else if n > 2 then
-        let l = Expr.get_args expr in ANDL (map expr2path l)
+        let l = Expr.get_args expr in ANDL (map_env expr2path l env)
       else (* Expr.get_num_args <  2 *) raise (Failure "SHOULD NOT COME HERE")
     end
   | OP_EQ -> (* equal *) let [hd; tl] = Expr.get_args expr in EQ (expr2val hd env, expr2val tl env)
