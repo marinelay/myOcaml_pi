@@ -46,6 +46,22 @@ let neq ctx expr1 expr2 = (not_b ctx (eq ctx expr1 expr2))
 
 let quan quant = Z3.Quantifier.expr_of_quantifier quant
 
+type bound_env = Z3.Symbol.symbol list
+
+let empty_bound = []
+let rec append_bound l bound_env
+= let tmp = 
+  (match l with
+  | [] -> []
+  | hd::tl -> (append_env tl bound_env)@[hd] 
+  ) in tmp@bound_env
+
+let rec find_bound n bound_env 
+= match bound_env with
+  | [] -> raise(Failure "No bound var..")
+  | hd::tl ->
+    if n > 0 then find_bound (n-1) bound_env else hd
+
 exception NotComputableValue
 
 let rec val2expr_aux : context -> value -> Expr.expr
@@ -73,13 +89,23 @@ let rec val2expr_aux : context -> value -> Expr.expr
 let val2expr : value -> Expr.expr
 = fun v -> val2expr_aux (new_ctx()) v
 
-let rec expr2val : Expr.expr -> value
-= fun expr -> 
+let rec expr2val : Expr.expr -> bound_env -> value
+= fun expr env -> 
+  print_endline("num : " ^ string_of_int (Expr.get_num_args expr));
+
   if AST.is_var (Expr.ast_of_expr expr) (* quantifier *)
   then 
-    let test = Quantifier.get_index expr in 
-    print_endline(string_of_int test);
-    
+    let num = Quantifier.get_index expr in 
+    let get_symbol = find_bound num env in
+    let str = Symbol.get_string get_symbol in
+    let l = Str.split (Str.regexp "_") str in
+    match l with
+    | [hd; tl] ->
+      if hd = "alpha" then SInt (int_of_string tl)
+      else if hd = "beta" then SBool (int_of_string tl)
+      else raise (Failure "SHOULD NOT COME HERE")
+    | _ -> raise (Failure "SHOULD NOT COME HERE")
+
   else
   let op = FuncDecl.get_decl_kind (Expr.get_func_decl expr) in
   match op with
@@ -106,16 +132,63 @@ let rec expr2val : Expr.expr -> value
       if n = 2 then
       begin
         let [hd; tl] = Expr.get_args expr in
-        SArith (SADD, expr2val hd, expr2val tl)
+        SArith (SADD, expr2val hd env, expr2val tl env)
       end
       else if n > 2 then
       begin
         let l = Expr.get_args expr in
-        Sum (map expr2val l)
+        Sum (map_env expr2val l env)
       end
       else (* Expr.get_num_args < 2 *) raise (Failure "SHOULD NOT COME HERE")
     end
 
+
+(*let rec repair_quantifier : Expr.expr -> Quantifier.quantifier -> value
+= fun expr quant ->
+
+  if AST.is_var (Expr.ast_of_expr expr) (* quantifier *)
+  then 
+    let index = Quantifier.get_index expr in
+    let rec find_val = fun l n ->
+    begin
+    match l with
+    | [] -> raise (Failure "SHOULD NOT COME HERE")
+    | hd::tl -> 
+      if n > 0 then begin  find_val tl n-1 end else begin
+      let str = Symbol.get_string hd in
+      let get_name = (let l = Str.split (Str.regexp "_") str in
+      begin
+      match l with
+      | [hd; tl] ->
+        if hd = "alpha" then SInt (int_of_string tl)
+        else if hd = "beta" then SBool (int_of_string tl)
+        else raise (Failure "SHOULD NOT COME HERE")
+      | _ -> raise (Failure "SHOULD NOT COME HERE")
+      end
+      )
+    end
+    end 
+    in find_val (Quantifier.get_bound_variable_names quant) index
+
+  else
+  let op = FuncDecl.get_decl_kind (Expr.get_func_decl expr) in
+  match op with
+  | OP_ADD -> (* sum *)
+    begin
+      let n = Expr.get_num_args expr in
+      if n = 2 then
+      begin
+        let [hd; tl] = Expr.get_args expr in
+        SArith (SADD, expr2val (repair_quantifier hd), expr2val (repair_quantifier tl))
+      end
+      else if n > 2 then
+      begin
+        let l = Expr.get_args expr in
+        Sum (map expr2val (repair_quantifier l))
+      end
+      else (* Expr.get_num_args < 2 *) raise (Failure "SHOULD NOT COME HERE")
+    end
+  | _ -> expr2val expr*)
 
 let rec path2expr_aux : context -> path_cond -> Expr.expr
 = fun ctx p ->
@@ -141,35 +214,21 @@ let rec path2expr_aux : context -> path_cond -> Expr.expr
 let path2expr : path_cond -> Expr.expr
 = fun p -> path2expr_aux (new_ctx ()) p
 
-let rec expr2path : Expr.expr -> path_cond
-= fun expr ->
+let rec expr2path : Expr.expr -> bound_env -> path_cond
+= fun expr env ->
 print_endline("path : " ^ Expr.to_string expr);
   let is_quantifier = AST.get_ast_kind (Expr.ast_of_expr expr) in
   match is_quantifier with
   | QUANTIFIER_AST ->
     let quant = Quantifier.quantifier_of_expr expr in
-    let hd::tl = Quantifier.get_bound_variable_names quant in(* 리스트 처리를 안해서 임의로 이렇게... *)
-    let str = Symbol.get_string hd in
-    print_endline(str);
-    let get_name = (let l = Str.split (Str.regexp "_") str in
-    match l with
-    | [hd; tl] ->
-      if hd = "alpha" then SInt (int_of_string tl)
-      else if hd = "beta" then SBool (int_of_string tl)
-      else raise (Failure "SHOULD NOT COME HERE")
-    | _ -> raise (Failure "SHOULD NOT COME HERE")
-    ) in 
-    let body = Quantifier.get_body quant in
+    let name_list = Quantifier.get_bound_variable_names quant in
+    let env = append_bound name_list env in
 
-    let hd::tl = Expr.get_args body in
-
-    print_endline(Expr.to_string(hd));
-    print_endline(string_of_int (Quantifier.get_num_no_patterns quant))  ;  
     if Quantifier.is_universal quant
     then (* forall *)
-      QUAN_ALL(get_name, expr2path body)
+      QUAN_ALL(get_name, expr2path body env)
     else (* exist *)
-      QUAN_EXIST(get_name, expr2path body)
+      QUAN_EXIST(get_name, expr2path body env)
   | _ ->
   begin
   
@@ -183,7 +242,7 @@ print_endline("path : " ^ Expr.to_string expr);
       let n = Expr.get_num_args expr in
       if n = 2 then
       begin
-        let [hd; tl] = Expr.get_args expr in AND (expr2path hd, expr2path tl)
+        let [hd; tl] = Expr.get_args expr in AND (expr2path hd env, expr2path tl env)
       end
       else if n > 2 then
       begin
@@ -195,17 +254,17 @@ print_endline("path : " ^ Expr.to_string expr);
     begin
       let n = Expr.get_num_args expr in
       if n = 2 then
-        let [hd; tl] = Expr.get_args expr in OR (expr2path hd, expr2path tl)
+        let [hd; tl] = Expr.get_args expr in OR (expr2path hd env, expr2path tl env)
       else if n > 2 then
         let l = Expr.get_args expr in ANDL (map expr2path l)
       else (* Expr.get_num_args <  2 *) raise (Failure "SHOULD NOT COME HERE")
     end
-  | OP_EQ -> (* equal *) let [hd; tl] = Expr.get_args expr in EQ (expr2val hd, expr2val tl)
-  | OP_NOT -> let [e] = Expr.get_args expr in NOT (expr2path e)
-  | OP_LE -> print_endline("!!"); let [hd; tl] = Expr.get_args expr in LESSEQUAL (expr2val hd, expr2val tl)
-  | OP_GE -> let [hd; tl] = Expr.get_args expr in GREATEQUAL (expr2val hd, expr2val tl)
-  | OP_LT -> let [hd; tl] = Expr.get_args expr in LESSTHAN (expr2val hd, expr2val tl)
-  | OP_GT -> let [hd; tl] = Expr.get_args expr in GREATTHAN (expr2val hd, expr2val tl)
+  | OP_EQ -> (* equal *) let [hd; tl] = Expr.get_args expr in EQ (expr2val hd env, expr2val tl env)
+  | OP_NOT -> let [e] = Expr.get_args expr in NOT (expr2path e env)
+  | OP_LE -> let [hd; tl] = Expr.get_args expr in LESSEQUAL (expr2val hd env, expr2val tl env)
+  | OP_GE -> let [hd; tl] = Expr.get_args expr in GREATEQUAL (expr2val hd env, expr2val tl env)
+  | OP_LT -> let [hd; tl] = Expr.get_args expr in LESSTHAN (expr2val hd env, expr2val tl env)
+  | OP_GT -> let [hd; tl] = Expr.get_args expr in GREATTHAN (expr2val hd env, expr2val tl env)
 
   | _ -> raise (Failure "expr2path: Not Implemented")
   end

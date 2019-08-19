@@ -40,6 +40,7 @@ type value =
   | None (* For array empty *)
   | Sum of value list
   | Return
+  | Quantifier of int (* for quantifier var *)
 
 
 and arith_op = SADD
