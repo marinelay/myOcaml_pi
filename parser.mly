@@ -29,6 +29,7 @@
 %token AND_S
 %token COMMA
 %token IMPLY
+%token NOTEQ
 
 %token EXIST, FORALL
 %token DOT
@@ -53,7 +54,7 @@ program:
   ;
 
 start:
-  | AT pre_conds AT pre_conds ID LPAREN inits RPAREN LCURLY stmt RCURLY { Calc.FUNC_START ( $2, $7, $10, $4) }
+  | AT bexp AT bexp ID LPAREN inits RPAREN LCURLY stmt RCURLY { Calc.FUNC_START ( $2, $7, $10, $4) }
 
 stmt:
   | stmt stmt { Calc.SEQ ($1, $2) }
@@ -61,7 +62,7 @@ stmt:
   | IF LPAREN exp RPAREN LCURLY stmt RCURLY ELSE LCURLY stmt RCURLY  { Calc.IF ($3, $6, $10) }
   | IF LPAREN exp RPAREN LCURLY stmt RCURLY { Calc.IF ($3, $6, Calc.UNIT) }
   | LPAREN RPAREN { Calc.UNIT }
-  | AT pre_conds FOR LPAREN assign SEMI exp SEMI assign RPAREN LCURLY stmt RCURLY { Calc.FOR ($2, $5, $7, $9, $12) }
+  | AT bexp FOR LPAREN assign SEMI exp SEMI assign RPAREN LCURLY stmt RCURLY { Calc.FOR ($2, $5, $7, $9, $12) }
   | RETURN bool SEMI { Calc.RETURN $2 }
   | RETURN ID LPAREN exps RPAREN SEMI { Calc.RETURN_FUNC ($4) }
 
@@ -70,14 +71,12 @@ exps:
   | exp {[$1]}
 
 exp:
-    
   | NUM { Calc.INT $1 }
-  | bool { $1 }
+  | bexp { $1 }
   | ID { Calc.VAR $1 }
   | ID LBLOCK exp RBLOCK { Calc.ARR ($1, $3)}
   | LPAREN exp RPAREN { $2 }
   | exp PLUS exp { Calc.ADD ($1, $3) }
-  | bexp {$1}
 
 bool:
   | TRUE { Calc.TRUE }
@@ -108,10 +107,8 @@ pre_conds:
   
 
 pre_cond:
-  | LPAREN bexp IMPLY bexp RPAREN { Calc.IMPLY ($2, $4)}
   | bexp { $1 }
-  | EXIST id_list DOT LPAREN pre_conds RPAREN { Calc.EXIST($2, $5) }
-  | FORALL id_list DOT LPAREN pre_conds RPAREN { Calc.FORALL($2, $5) }
+
 
 id_list:
   | ID { [$1] }
@@ -119,7 +116,13 @@ id_list:
 
 bexp :
   | bool { $1 }
+  | LPAREN bexp RPAREN {$2}
+  | EXIST id_list DOT LPAREN bexp RPAREN { Calc.EXIST($2, $5) }
+  | FORALL id_list DOT LPAREN bexp RPAREN { Calc.FORALL($2, $5) }
+  | bexp AND_S bexp { Calc.AND_EXP ($1, $3)}
+  | bexp IMPLY bexp { Calc.IMPLY ($1, $3)}
   | exp EQUAL exp { Calc.EQUAL ($1, $3) }
+  | exp NOTEQ exp { Calc.NOTEQUAL ($1, $3) }
   | exp LT exp { Calc.LT ($1, $3) }
   | exp LE exp { Calc.LE ($1, $3) }
   | exp GT exp { Calc.GT ($1, $3) }

@@ -52,6 +52,7 @@ rule start = parse
   | "]" { RBLOCK }
   | "->" { IMPLY }
   | "==" {EQEQ}
+  | "!=" {NOTEQ}
   | "<" { LT }
   | "<=" { LE }
   | ">" { GT }

@@ -40,6 +40,7 @@ let rec solve : context -> solver -> (value * path_cond * env) list -> bool
       | _ -> false
       ) in
       (*Z3_translator.and_b ctx (path2expr_aux ctx partial) rst*)
+      print_endline(string_of_bool partial);
       partial && rst
     ) l1 (Z3_translator.const_b ctx true) in
     (*let expr = Z3_translator.not_b ctx expr in*)

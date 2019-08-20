@@ -1,6 +1,8 @@
-@ (x<3 -> a[i]<3) @ a[i]<x test (int a[] int i int x) 
+@ true @ (i+1)>=j test (int a[] int x int l int e) 
 { 
-
-int a[i] := a[i]+1;
-return true;
+@ l < j
+for (int i := x; i < j; int i:=i+1) {
+    if(i = j) {return true;}
+}
+return false;
 }

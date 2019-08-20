@@ -7,7 +7,7 @@ open Solve
 let prog : program -> unit
 = fun p1 ->
   let _ = init_sym_cnt () in 
-  let r1 = eval_exp p1 empty_env TRUE [] [] in
+  let r1 = eval_exp p1 empty_env TRUE TRUE TRUE in
   (*let rv1 = list_simplify !empty_algo in*)
   let ctx = Z3_translator.new_ctx () in
   let solver = Z3.Solver.mk_solver ctx None in
@@ -28,7 +28,7 @@ let run : program -> unit
             print_endline ("value: " ^ value2str (simplify_val (v)));
             print_newline ();
             print_aux tl (cnt + 1)
-    in let r = eval_exp pgm empty_env TRUE [] [] in print_aux !empty_algo 1
+    in let r = eval_exp pgm empty_env TRUE TRUE TRUE in print_aux !empty_algo 1
     
 
 let main () =

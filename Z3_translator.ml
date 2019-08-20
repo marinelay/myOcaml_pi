@@ -75,7 +75,7 @@ let rec val2expr_aux : context -> value -> Expr.expr
     )
   | SIndex (id, v1, v2) ->
       let arr = arr_n ctx ("array_" ^ string_of_int id) (arr_sort ctx) in
-      let arr = arr_store ctx arr (val2expr_aux ctx v1) (val2expr_aux ctx v2) in
+      (*let arr = arr_store ctx arr (val2expr_aux ctx v1) (val2expr_aux ctx v2) in*)
       arr_select ctx arr (val2expr_aux ctx v1)
   | Sum l ->
     (
@@ -128,6 +128,14 @@ let rec expr2val : Expr.expr -> bound_env -> value
         Sum (map_env expr2val l env)
       end
       else (* Expr.get_num_args < 2 *) raise (Failure "SHOULD NOT COME HERE")
+    end
+  | OP_SELECT -> 
+    begin
+      let tmp = Expr.get_args expr in
+      let [hd; tl] = tmp in
+      print_endline (Expr.to_string hd);
+      print_endline (Expr.to_string tl);
+      raise(Failure("asdf"))
     end
 
 let rec path2expr_aux : context -> path_cond -> Expr.expr
