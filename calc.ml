@@ -14,6 +14,8 @@ and exp =
   | LE of exp * exp
   | GT of exp * exp
   | GE of exp * exp
+  | IMPLY of exp * exp
+  | AND of exp * exp
   | ASSIGN of var * exp
   | ASSIGN_ARR of var * exp * exp
   | SEQ of exp * exp
@@ -22,8 +24,8 @@ and exp =
   | RETURN of exp
   | RETURN_FUNC of exp list
 
-  | EXIST of var * exp list
-  | FORALL of var * exp list
+  | EXIST of var list * exp list
+  | FORALL of var list * exp list
 and var = string
 ;;
 
@@ -61,8 +63,8 @@ and sym_exp =
   | ANDL of sym_exp list
   | ORL of sym_exp list
 
-  | QUAN_ALL of value * sym_exp
-  | QUAN_EXIST of value * sym_exp
+  | QUAN_ALL of value list * sym_exp
+  | QUAN_EXIST of value list * sym_exp
 and path_cond = sym_exp
 
 let func_args = ref []
@@ -138,9 +140,11 @@ and cond2str : sym_exp -> string
   | LESSEQUAL (v1, v2) -> "(" ^ value2str v1 ^ " <= " ^ value2str v2 ^ ")"
   | GREATTHAN (v1, v2) -> "(" ^ value2str v1 ^ " > " ^ value2str v2 ^ ")"
   | GREATEQUAL (v1, v2) -> "(" ^ value2str v1 ^ " >= " ^ value2str v2 ^ ")"
+  | ANDL l -> "(" ^ fold (fun v1 s2 -> cond2str v1 ^ (if s2 = ")" then "" else " and ") ^ s2) l ")"
+  | ORL l -> "(" ^ fold (fun v1 s2 -> cond2str v1 ^ (if s2 = ")" then "" else " or ") ^ s2) l ")"
 
-  | QUAN_EXIST (v1, e) -> "(There Exist " ^ value2str v1 ^ " s.t. " ^ cond2str e ^ ")"
-  | QUAN_ALL (v1, e) -> "(For All " ^ value2str v1 ^ " s.t. " ^ cond2str e ^ ")"
+  | QUAN_EXIST (v1, e) -> "(There Exist " ^ (map_list_value value2str v1) ^ " s.t. " ^ cond2str e ^ ")"
+  | QUAN_ALL (v1, e) -> "(For All " ^ (map_list_value value2str v1) ^ " s.t. " ^ cond2str e ^ ")"
 
   (* 타입 맞춰주기 *)
   (*
@@ -280,6 +284,19 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
             )
           )
       )
+
+  | IMPLY (e1, e2) ->
+    let l1 = eval_exp e1 env pi pre post in
+    eval_exp_aux l1 (fun v1 pi1 env -> 
+      let l2 = eval_exp e2 env pi pre post in
+      eval_exp_aux l2 (fun v2 pi2 env ->
+            (match (v1, v2) with
+            | _ -> [(Bool true, AND(pi, OR((NOT pi1), pi2)), env)]
+            )
+      )
+    )
+
+
   | SEQ (e1, e2) ->
     let l1 = eval_exp e1 env pi pre post in 
       eval_exp_aux l1 (fun v pi env -> 
@@ -401,7 +418,12 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
         )
 
   | FORALL (v, conds) ->
-    let num = new_sym () in let env = append_env env (v, SInt num) in
+    let rec get_bound_var = fun l env ->
+    (match l with
+    | [] -> env
+    | hd::tl -> get_bound_var tl (append_env env (hd, SInt (new_sym()))) 
+    ) in
+    let env = get_bound_var v env in
     let rec conds_to_value : exp list -> env -> path_cond -> (value * path_cond * env) list
     = fun conds env pi ->
       (match conds with
@@ -413,12 +435,22 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
         )
       ) in let body = conds_to_value conds env TRUE in
         eval_exp_aux body (fun w pi2 env ->
-          [(Bool true, AND(pi, QUAN_ALL(apply_env env v, pi2)), env)]
+          let rec bound_var_list = fun l env ->
+          (match l with
+          | [] -> []
+          | hd::tl -> (apply_env env hd)::(bound_var_list tl env)
+          ) in
+          [(Bool true, AND(pi, QUAN_ALL(bound_var_list v env, pi2)), env)]
         )
         
 
   | EXIST (v, conds) ->
-    let num = new_sym() in let env = append_env env (v, SInt num) in
+    let rec get_bound_var = fun l env ->
+    (match l with
+    | [] -> env
+    | hd::tl -> get_bound_var tl (append_env env (hd, SInt (new_sym()))) 
+    ) in
+    let env = get_bound_var v env in
     let rec conds_to_value : exp list -> env -> path_cond -> (value * path_cond * env) list
     = fun conds env pi ->
       (match conds with
@@ -430,7 +462,12 @@ let rec eval_exp : exp -> env -> path_cond -> exp list -> exp list -> (value * p
         )
       ) in let body = conds_to_value conds env TRUE in
       eval_exp_aux body (fun w pi2 env ->
-        [(Bool true, AND(pi, QUAN_EXIST(apply_env env v, pi2)), env)]
+          let rec bound_var_list = fun l env ->
+          (match l with
+          | [] -> []
+          | hd::tl -> (apply_env env hd)::(bound_var_list tl env)
+          ) in
+          [(Bool true, AND(pi, QUAN_EXIST(bound_var_list v env, pi2)), env)]
       )
 
     

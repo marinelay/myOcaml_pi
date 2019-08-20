@@ -50,6 +50,7 @@ rule start = parse
   | "}" { RCURLY }
   | "[" { LBLOCK }
   | "]" { RBLOCK }
+  | "->" { IMPLY }
   | "==" {EQEQ}
   | "<" { LT }
   | "<=" { LE }

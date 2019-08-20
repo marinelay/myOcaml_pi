@@ -28,6 +28,7 @@
 %token FOR
 %token AND_S
 %token COMMA
+%token IMPLY
 
 %token EXIST, FORALL
 %token DOT
@@ -35,6 +36,8 @@
 
 %left PLUS MINUS
 %left STAR SLASH
+%left AND_S
+%left IMPLY
 
 %left SEMI
 
@@ -74,7 +77,7 @@ exp:
   | ID LBLOCK exp RBLOCK { Calc.ARR ($1, $3)}
   | LPAREN exp RPAREN { $2 }
   | exp PLUS exp { Calc.ADD ($1, $3) }
-  | compare {$1}
+  | bexp {$1}
 
 bool:
   | TRUE { Calc.TRUE }
@@ -105,17 +108,23 @@ pre_conds:
   
 
 pre_cond:
-  | compare { $1 }
-  | EXIST ID DOT LPAREN pre_conds RPAREN { Calc.EXIST($2, $5) }
-  | FORALL ID DOT LPAREN pre_conds RPAREN { Calc.FORALL($2, $5) }
+  | LPAREN bexp IMPLY bexp RPAREN { Calc.IMPLY ($2, $4)}
+  | bexp { $1 }
+  | EXIST id_list DOT LPAREN pre_conds RPAREN { Calc.EXIST($2, $5) }
+  | FORALL id_list DOT LPAREN pre_conds RPAREN { Calc.FORALL($2, $5) }
 
-compare:
+id_list:
+  | ID { [$1] }
+  | id_list COMMA ID { $1@[$3] }
+
+bexp :
   | bool { $1 }
   | exp EQUAL exp { Calc.EQUAL ($1, $3) }
   | exp LT exp { Calc.LT ($1, $3) }
   | exp LE exp { Calc.LE ($1, $3) }
   | exp GT exp { Calc.GT ($1, $3) }
   | exp GE exp { Calc.GE ($1, $3) }
+  
 
 %%
 

@@ -8,6 +8,11 @@ let rec map_env f l env =
   | [] -> []
   | hd::tl -> (f hd env)::(map_env f tl env)
 
+let rec map_list_value f l =
+  match l with
+  | [] -> ""
+  | hd::tl -> (f hd) ^ (map_list_value f tl)
+
 let rec fold f l a=
   match l with
   | [] -> a

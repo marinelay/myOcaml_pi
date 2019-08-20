@@ -46,15 +46,13 @@ let neq ctx expr1 expr2 = (not_b ctx (eq ctx expr1 expr2))
 
 let quan quant = Z3.Quantifier.expr_of_quantifier quant
 
-type bound_env = Z3.Symbol.symbol list
+type bound_env = value list
 
 let empty_bound = []
 let rec append_bound l bound_env
-= let rec get_symbol l = 
-  (match l with
-  | [] -> []
-  | hd::tl -> hd::(get_symbol tl)
-  ) in bound_env@(get_symbol l)
+= match l with
+  | [] -> bound_env
+  | hd::tl -> hd::(append_bound tl bound_env)
 
 let rec find_bound n bound_env 
 = match bound_env with
@@ -94,16 +92,7 @@ let rec expr2val : Expr.expr -> bound_env -> value
   if AST.is_var (Expr.ast_of_expr expr) (* quantifier *)
   then 
     let num = Quantifier.get_index expr in 
-    print_endline(Expr.to_string expr ^ " : " ^ string_of_int num);
-    let get_symbol = find_bound num env in
-    let str = Symbol.get_string get_symbol in
-    let l = Str.split (Str.regexp "_") str in
-    match l with
-    | [hd; tl] ->
-      if hd = "alpha" then SInt (int_of_string tl)
-      else if hd = "beta" then SBool (int_of_string tl)
-      else raise (Failure "SHOULD NOT COME HERE")
-    | _ -> raise (Failure "SHOULD NOT COME HERE")
+    find_bound num env
 
   else
   let op = FuncDecl.get_decl_kind (Expr.get_func_decl expr) in
@@ -141,54 +130,6 @@ let rec expr2val : Expr.expr -> bound_env -> value
       else (* Expr.get_num_args < 2 *) raise (Failure "SHOULD NOT COME HERE")
     end
 
-
-(*let rec repair_quantifier : Expr.expr -> Quantifier.quantifier -> value
-= fun expr quant ->
-
-  if AST.is_var (Expr.ast_of_expr expr) (* quantifier *)
-  then 
-    let index = Quantifier.get_index expr in
-    let rec find_val = fun l n ->
-    begin
-    match l with
-    | [] -> raise (Failure "SHOULD NOT COME HERE")
-    | hd::tl -> 
-      if n > 0 then begin  find_val tl n-1 end else begin
-      let str = Symbol.get_string hd in
-      let get_name = (let l = Str.split (Str.regexp "_") str in
-      begin
-      match l with
-      | [hd; tl] ->
-        if hd = "alpha" then SInt (int_of_string tl)
-        else if hd = "beta" then SBool (int_of_string tl)
-        else raise (Failure "SHOULD NOT COME HERE")
-      | _ -> raise (Failure "SHOULD NOT COME HERE")
-      end
-      )
-    end
-    end 
-    in find_val (Quantifier.get_bound_variable_names quant) index
-
-  else
-  let op = FuncDecl.get_decl_kind (Expr.get_func_decl expr) in
-  match op with
-  | OP_ADD -> (* sum *)
-    begin
-      let n = Expr.get_num_args expr in
-      if n = 2 then
-      begin
-        let [hd; tl] = Expr.get_args expr in
-        SArith (SADD, expr2val (repair_quantifier hd), expr2val (repair_quantifier tl))
-      end
-      else if n > 2 then
-      begin
-        let l = Expr.get_args expr in
-        Sum (map expr2val (repair_quantifier l))
-      end
-      else (* Expr.get_num_args < 2 *) raise (Failure "SHOULD NOT COME HERE")
-    end
-  | _ -> expr2val expr*)
-
 let rec path2expr_aux : context -> path_cond -> Expr.expr
 = fun ctx p ->
   match p with
@@ -205,10 +146,10 @@ let rec path2expr_aux : context -> path_cond -> Expr.expr
   | GREATEQUAL (p1, p2) -> ge ctx (val2expr_aux ctx p1) (val2expr_aux ctx p2)
 
   | QUAN_EXIST (p1, body) -> 
-  quan (Z3.Quantifier.mk_exists_const ctx [(val2expr_aux ctx p1)] (path2expr_aux ctx body) None [] [] None None)
+  quan (Z3.Quantifier.mk_exists_const ctx (map (val2expr_aux ctx) p1) (path2expr_aux ctx body) None [] [] None None)
 
   | QUAN_ALL (p1, body) -> 
-  quan (Z3.Quantifier.mk_forall_const ctx [(val2expr_aux ctx p1)] (path2expr_aux ctx body) None [] [] None None)
+  quan (Z3.Quantifier.mk_forall_const ctx (map (val2expr_aux ctx) p1) (path2expr_aux ctx body) None [] [] None None)
 
 let path2expr : path_cond -> Expr.expr
 = fun p -> path2expr_aux (new_ctx ()) p
@@ -219,26 +160,34 @@ let rec expr2path : Expr.expr -> bound_env -> path_cond
   match is_quantifier with
   | QUANTIFIER_AST ->
     let quant = Quantifier.quantifier_of_expr expr in
-    let name_list = Quantifier.get_bound_variable_names quant in
-    let env = append_bound name_list env in
+    let symbol_list = Quantifier.get_bound_variable_names quant in
+
+    let rec sym2val = fun symbol_list ->
+    (match symbol_list with
+    | [] -> []
+    | hd::tl ->
+      let str = Symbol.get_string hd in
+      let l = Str.split (Str.regexp "_") str in
+      let get_name = 
+      (match l with
+      | [hd; tl] ->
+        if hd = "alpha" then SInt (int_of_string tl)
+        else if hd = "beta" then SBool (int_of_string tl)
+        else raise (Failure "SHOULD NOT COME HERE")
+      | _ -> raise (Failure "SHOULD NOT COME HERE")
+      ) in
+      get_name::(sym2val tl)
+    ) in
+    let val_list = sym2val symbol_list in
+
+    let env = append_bound val_list env in
     let body = Quantifier.get_body quant in
 
-    let hd::tl = name_list in 
-    let str = Symbol.get_string hd in
-    let l = Str.split (Str.regexp "_") str in
-    let get_name = 
-    (match l with
-    | [hd; tl] ->
-      if hd = "alpha" then SInt (int_of_string tl)
-      else if hd = "beta" then SBool (int_of_string tl)
-      else raise (Failure "SHOULD NOT COME HERE")
-    | _ -> raise (Failure "SHOULD NOT COME HERE")
-    ) in
     if Quantifier.is_universal quant
     then (* forall *)
-      QUAN_ALL(get_name, expr2path body env)
+      QUAN_ALL(val_list, expr2path body env)
     else (* exist *)
-      QUAN_EXIST(get_name, expr2path body env)
+      QUAN_EXIST(val_list, expr2path body env)
   | _ ->
   begin
   
