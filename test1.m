@@ -1,8 +1,5 @@
-@ true @ (i+1)>=j test (int a[] int x int l int e) 
+@ i < j  @ exist i. (i<j -> a[i] = x) test (int a[] int x int i int j) 
 { 
-@ l < j
-for (int i := x; i < j; int i:=i+1) {
-    if(i = j) {return true;}
-}
-return false;
+
+return true;
 }

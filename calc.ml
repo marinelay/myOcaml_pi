@@ -42,6 +42,7 @@ type value =
   | SArith of arith_op * value * value
   | None (* For array empty *)
   | Sum of value list
+  | Bound of id (* for quantifier var *)
   | Return
 
 
@@ -126,6 +127,7 @@ let rec value2str : value -> string
   | Sum l -> "(" ^ fold (fun v1 s2 -> value2str v1 ^ (if s2 = ")" then "" else " + ") ^ s2) l ")"
   | Return -> "output"
   | None -> "none"
+  | Bound n -> "bound" ^ string_of_int n
 
 and cond2str : sym_exp -> string
 = fun pi ->
@@ -385,10 +387,10 @@ let rec eval_exp : exp -> env -> path_cond -> exp -> exp -> (value * path_cond *
     (* Partial Correctenss *)
     let init_exp = eval_exp init env pi pre post in
     eval_exp_aux init_exp (fun v_init pi_init env_init ->
-      let pre_exp = eval_exp pre env_init TRUE pre post in
+      let pre_exp = eval_exp pre env TRUE pre post in
       eval_exp_aux pre_exp (fun v_pre pi_pre env_pre ->
         let _ = append_algo [(Bool true, AND(pi_init, NOT pi_pre), env_init)] in
-        let cond_exp = eval_exp cond env_init TRUE pre post in
+        let cond_exp = eval_exp cond env TRUE pre post in
         eval_exp_aux cond_exp (fun v_cond pi_cond env_cond ->
           (* Cond is true *)
           let body_exp = eval_exp body env_cond (AND(pi_pre, pi_cond)) pre post in
@@ -439,7 +441,7 @@ let rec eval_exp : exp -> env -> path_cond -> exp -> exp -> (value * path_cond *
     let rec is_there_bound_var = fun l env ->
     (match l with
     | [] -> env
-    | hd::tl -> is_there_bound_var tl (append_env env (hd, SInt (new_sym())))
+    | hd::tl -> is_there_bound_var tl (append_env env (hd, Bound (new_sym())))
     ) in
     let env = is_there_bound_var v env in
       let body = eval_exp conds env pi pre post in
@@ -456,9 +458,10 @@ let rec eval_exp : exp -> env -> path_cond -> exp -> exp -> (value * path_cond *
 
   | EXIST (v, conds) ->
     let rec is_there_bound_var = fun l env ->
+    print_endline("Here");
     (match l with
     | [] -> env
-    | hd::tl -> is_there_bound_var tl (append_env env (hd, SInt (new_sym())))
+    | hd::tl -> is_there_bound_var tl (append_env env (hd, Bound (new_sym())))
     ) in
     let env = is_there_bound_var v env in
       let body = eval_exp conds env pi pre post in

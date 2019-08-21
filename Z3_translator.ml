@@ -60,6 +60,15 @@ let rec find_bound n bound_env
   | hd::tl ->
     if n > 0 then find_bound (n-1) tl else hd
 
+(*let arr_env = ref []
+let append_arr (x, e) env
+= arr_env := (x, e)::env
+
+let rec apply_arr x expr env
+= match env with
+  | [] -> let _ = arr_env := (x, expr)::!arr_env in expr 
+  | (y, e)::tl -> if y=x then e else apply_arr x expr tl*)
+
 exception NotComputableValue
 
 let rec val2expr_aux : context -> value -> Expr.expr
@@ -75,14 +84,23 @@ let rec val2expr_aux : context -> value -> Expr.expr
     )
   | SIndex (id, v1, v2) ->
       let arr = arr_n ctx ("array_" ^ string_of_int id) (arr_sort ctx) in
-      (*let arr = arr_store ctx arr (val2expr_aux ctx v1) (val2expr_aux ctx v2) in*)
-      arr_select ctx arr (val2expr_aux ctx v1)
+      (match v1 with 
+      | Bound _ -> arr_select ctx arr (val2expr_aux ctx v1)
+      | _ ->
+        let tmp = arr_select ctx arr (val2expr_aux ctx v1) in
+        print_endline(Expr.to_string tmp);
+        let arr = arr_store ctx arr (val2expr_aux ctx v1) (val2expr_aux ctx v2) in
+        let tmp = arr_select ctx arr (val2expr_aux ctx v1) in
+        print_endline(Expr.to_string tmp); tmp
+      )
+
   | Sum l ->
     (
     match l with
     | [] -> val2expr_aux ctx (Int 0)
     | hd::tl -> add ctx (val2expr_aux ctx hd) (val2expr_aux ctx (Sum tl))
     )
+  | Bound id -> mk_const ctx ("bound_" ^ string_of_int id) (int_sort ctx)
 
 let val2expr : value -> Expr.expr
 = fun v -> val2expr_aux (new_ctx()) v
@@ -111,6 +129,7 @@ let rec expr2val : Expr.expr -> bound_env -> value
       | [hd; tl] ->
         if hd = "alpha" then SInt (int_of_string tl)
         else if hd = "beta" then SBool (int_of_string tl)
+        else if hd = "bound" then Bound (int_of_string tl)
         else raise (Failure "SHOULD NOT COME HERE")
       | _ -> raise (Failure "SHOULD NOT COME HERE")
     end
@@ -133,9 +152,8 @@ let rec expr2val : Expr.expr -> bound_env -> value
     begin
       let tmp = Expr.get_args expr in
       let [hd; tl] = tmp in
-      print_endline (Expr.to_string hd);
-      print_endline (Expr.to_string tl);
-      raise(Failure("asdf"))
+      let [_; id] = Str.split (Str.regexp "_") (Expr.to_string hd) in
+      SIndex(int_of_string id, expr2val tl env, None)
     end
 
 let rec path2expr_aux : context -> path_cond -> Expr.expr
@@ -181,6 +199,7 @@ let rec expr2path : Expr.expr -> bound_env -> path_cond
       | [hd; tl] ->
         if hd = "alpha" then SInt (int_of_string tl)
         else if hd = "beta" then SBool (int_of_string tl)
+        else if hd = "bound" then Bound (int_of_string tl)
         else raise (Failure "SHOULD NOT COME HERE")
       | _ -> raise (Failure "SHOULD NOT COME HERE")
       ) in

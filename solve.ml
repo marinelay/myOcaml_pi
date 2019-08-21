@@ -33,10 +33,13 @@ let rec solve : context -> solver -> (value * path_cond * env) list -> bool
       let (v, pi, env) = tup in
       (*let eq_value = Z3_translator.eq ctx r (val2expr_aux ctx v) in (* ?? *)*)
       let exp_pi = path2expr_aux ctx pi in
+      let tmp = Expr.simplify exp_pi None in
+      print_endline("path_expr :" ^ Expr.to_string tmp);
       (*let exp = Z3_translator.and_b ctx eq_value exp_pi in*)
       let _ = Z3.Solver.add solver [exp_pi] in
       let partial = (match (check solver []) with
       | UNSATISFIABLE -> true
+      | UNKNOWN -> raise(Failure "?")
       | _ -> false
       ) in
       (*Z3_translator.and_b ctx (path2expr_aux ctx partial) rst*)
