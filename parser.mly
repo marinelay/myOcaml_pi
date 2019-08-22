@@ -64,7 +64,7 @@ stmt:
   | LPAREN RPAREN { Calc.UNIT }
   | AT bexp FOR LPAREN assign SEMI exp SEMI assign RPAREN LCURLY stmt RCURLY { Calc.FOR ($2, $5, $7, $9, $12) }
   | RETURN bool SEMI { Calc.RETURN $2 }
-  | RETURN ID LPAREN exps RPAREN SEMI { Calc.RETURN_FUNC ($4) }
+  | AT bexp RETURN ID LPAREN exps RPAREN SEMI { Calc.RETURN_FUNC ($2, $6) }
 
 exps:
   | exps COMMA exp { $1@[$3] } 
@@ -77,6 +77,8 @@ exp:
   | ID LBLOCK exp RBLOCK { Calc.ARR ($1, $3)}
   | LPAREN exp RPAREN { $2 }
   | exp PLUS exp { Calc.ADD ($1, $3) }
+  | exp SLASH exp { Calc.DIV ($1, $3)}
+  | exp MINUS exp {Calc.SUB ($1, $3)}
 
 bool:
   | TRUE { Calc.TRUE }
@@ -94,7 +96,7 @@ assign:
   | var_typ ID LBLOCK exp RBLOCK COLEQ exp { Calc.ASSIGN_ARR ($2, $4, $7) }
 
 inits:
-  | inits init { $1@[$2] }
+  | inits COMMA init { $1@[$3] }
   | init { [$1] }
 
 init:
@@ -120,7 +122,7 @@ bexp :
   | EXIST id_list DOT LPAREN bexp RPAREN { Calc.EXIST($2, $5) }
   | FORALL id_list DOT LPAREN bexp RPAREN { Calc.FORALL($2, $5) }
   | bexp AND_S bexp { Calc.AND_EXP ($1, $3)}
-  | bexp IMPLY bexp { Calc.IMPLY ($1, $3)}
+  | bexp IMPLY bexp { Calc.IMPLY_EXP ($1, $3)}
   | exp EQUAL exp { Calc.EQUAL ($1, $3) }
   | exp NOTEQ exp { Calc.NOTEQUAL ($1, $3) }
   | exp LT exp { Calc.LT ($1, $3) }

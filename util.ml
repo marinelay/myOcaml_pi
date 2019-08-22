@@ -11,7 +11,7 @@ let rec map_env f l env =
 let rec map_list_value f l =
   match l with
   | [] -> ""
-  | hd::tl -> (f hd) ^ (map_list_value f tl)
+  | hd::tl -> (f hd) ^ ", " ^ (map_list_value f tl)
 
 let rec fold f l a=
   match l with

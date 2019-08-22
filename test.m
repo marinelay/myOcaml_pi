@@ -1,4 +1,4 @@
-@ 0 <= l @ exist i.(l<=i and i<=u and a[i] = e) test (int a[] int l int u int e int i ) 
+@ 0 <= l @ exist i.(l<=i and i<=u and a[i] = e) LinearSearch (int a[], int l, int u, int e, int i ) 
 { 
 
 @ l <= i and forall j. ((l<=j and j<i) -> a[j] != e)

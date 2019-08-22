@@ -6,7 +6,7 @@ open Z3
 open Z3enums
 
 
-let new_ctx () = mk_context []
+let new_ctx () = mk_context [("timeout", "50")]
 
 (* sort *)
 let int_sort ctx = Z3.Arithmetic.Integer.mk_sort ctx
@@ -36,6 +36,7 @@ let minus ctx expr = Z3.Arithmetic.mk_unary_minus ctx expr
 (* bop *)
 let and_b ctx expr1 expr2 = Z3.Boolean.mk_and ctx [expr1; expr2]
 let or_b ctx expr1 expr2 = Z3.Boolean.mk_or ctx [expr1; expr2]
+let imply ctx expr1 expr2 = Z3.Boolean.mk_implies ctx expr1 expr2
 let lt ctx expr1 expr2 = Z3.Arithmetic.mk_lt ctx expr1 expr2
 let gt ctx expr1 expr2 = Z3.Arithmetic.mk_gt ctx expr1 expr2
 let le ctx expr1 expr2 = Z3.Arithmetic.mk_le ctx expr1 expr2
@@ -81,18 +82,23 @@ let rec val2expr_aux : context -> value -> Expr.expr
   | SArith (aop, v1, v2) ->
     (match aop with
     | SADD -> add ctx (val2expr_aux ctx v1) (val2expr_aux ctx v2)
+    | SSUB -> sub ctx (val2expr_aux ctx v1) (val2expr_aux ctx v2)
+    | SDIV -> div ctx (val2expr_aux ctx v1) (val2expr_aux ctx v2)
     )
-  | SIndex (id, v1, v2) ->
-      let arr = arr_n ctx ("array_" ^ string_of_int id) (arr_sort ctx) in
-      (match v1 with 
-      | Bound _ -> arr_select ctx arr (val2expr_aux ctx v1)
-      | _ ->
-        let tmp = arr_select ctx arr (val2expr_aux ctx v1) in
-        print_endline(Expr.to_string tmp);
-        let arr = arr_store ctx arr (val2expr_aux ctx v1) (val2expr_aux ctx v2) in
-        let tmp = arr_select ctx arr (val2expr_aux ctx v1) in
-        print_endline(Expr.to_string tmp); tmp
-      )
+  | SSelect (arr, i) ->
+      let arr_expr = arr_n ctx ("array_" ^ string_of_int (get_arr_id arr)) (arr_sort ctx) in
+      let SArr (_, arr_list) = arr in
+      let rec store_arr_value : (value * value) list -> context -> Expr.expr -> Expr.expr = fun arr_list ctx arr_expr ->
+      (match arr_list with
+      | [] -> arr_expr
+      | (i, v)::tl -> 
+        (match i with 
+        | Bound _ -> store_arr_value tl ctx arr_expr
+        | _ -> store_arr_value tl ctx (arr_store ctx arr_expr (val2expr_aux ctx i) (val2expr_aux ctx v))
+        )
+        
+      ) in let arr_expr = store_arr_value arr_list ctx arr_expr in
+      arr_select ctx arr_expr (val2expr_aux ctx i)
 
   | Sum l ->
     (
@@ -148,12 +154,69 @@ let rec expr2val : Expr.expr -> bound_env -> value
       end
       else (* Expr.get_num_args < 2 *) raise (Failure "SHOULD NOT COME HERE")
     end
+  | OP_SUB -> (* sub *)
+    begin
+      let n = Expr.get_num_args expr in
+      if n = 2 then
+      begin
+        let [hd; tl] = Expr.get_args expr in
+        SArith (SSUB, expr2val hd env, expr2val tl env)
+      end
+      else if n > 2 then
+      begin
+        let l = Expr.get_args expr in
+        Sum (map_env expr2val l env)
+      end
+      else (* Expr.get_num_args < 2 *) raise (Failure "SHOULD NOT COME HERE")
+    end
+  | OP_DIV -> (* div *)
+    begin
+      let n = Expr.get_num_args expr in
+      if n = 2 then
+      begin
+        let [hd; tl] = Expr.get_args expr in
+        SArith (SDIV, expr2val hd env, expr2val tl env)
+      end
+      else if n > 2 then
+      begin
+        let l = Expr.get_args expr in
+        Sum (map_env expr2val l env)
+      end
+      else (* Expr.get_num_args < 2 *) raise (Failure "SHOULD NOT COME HERE")
+    end
+  |	OP_IDIV -> (* integer div *)
+    begin
+      let n = Expr.get_num_args expr in
+      if n = 2 then
+      begin
+        let [hd; tl] = Expr.get_args expr in
+        SArith (SDIV, expr2val hd env, expr2val tl env)
+      end
+      else if n > 2 then
+      begin
+        let l = Expr.get_args expr in
+        Sum (map_env expr2val l env)
+      end
+      else (* Expr.get_num_args < 2 *) raise (Failure "SHOULD NOT COME HERE")
+    end
+
   | OP_SELECT -> 
     begin
-      let tmp = Expr.get_args expr in
-      let [hd; tl] = tmp in
-      let [_; id] = Str.split (Str.regexp "_") (Expr.to_string hd) in
-      SIndex(int_of_string id, expr2val tl env, None)
+      let [store; select] = Expr.get_args expr in
+      let rec solve2arr : Expr.expr -> (value * value) list -> value = fun expr val_list ->
+      if (Expr.get_num_args expr) > 0
+      then (
+        let hd::[v1; v2] = Expr.get_args expr in 
+        let v1 = expr2val v1 env in 
+        let v2 = expr2val v2 env in 
+        solve2arr hd ((v1, v2)::val_list)
+          
+        
+      ) else (
+        let str = Expr.to_string expr in
+        let [hd; id] = Str.split (Str.regexp "_") str in
+        SSelect(SArr(int_of_string id, val_list), expr2val select env)
+      ) in solve2arr store []
     end
 
 let rec path2expr_aux : context -> path_cond -> Expr.expr
@@ -163,6 +226,7 @@ let rec path2expr_aux : context -> path_cond -> Expr.expr
   | FALSE -> const_b ctx false
   | AND (p1, p2) -> and_b ctx (path2expr_aux ctx p1) (path2expr_aux ctx p2)
   | OR (p1, p2) -> or_b ctx (path2expr_aux ctx p1) (path2expr_aux ctx p2)
+  | IMPLY (p1, p2) -> imply ctx (path2expr_aux ctx p1) (path2expr_aux ctx p2)
   | NOT p -> not_b ctx (path2expr_aux ctx p)
   | EQ (p1, p2) -> eq ctx (val2expr_aux ctx p1) (val2expr_aux ctx p2)
   | NOTEQ (p1, p2) -> neq ctx (val2expr_aux ctx p1) (val2expr_aux ctx p2)
@@ -245,6 +309,7 @@ let rec expr2path : Expr.expr -> bound_env -> path_cond
         let l = Expr.get_args expr in ANDL (map_env expr2path l env)
       else (* Expr.get_num_args <  2 *) raise (Failure "SHOULD NOT COME HERE")
     end
+  |	OP_IMPLIES -> let [hd; tl] = Expr.get_args expr in IMPLY (expr2path hd env, expr2path tl env)
   | OP_EQ -> (* equal *) let [hd; tl] = Expr.get_args expr in EQ (expr2val hd env, expr2val tl env)
   | OP_NOT -> let [e] = Expr.get_args expr in NOT (expr2path e env)
   | OP_LE -> let [hd; tl] = Expr.get_args expr in LESSEQUAL (expr2val hd env, expr2val tl env)

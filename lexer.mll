@@ -44,6 +44,8 @@ rule start = parse
   }
   | "@" { AT }
   | "+" { PLUS }
+  | "-" {MINUS}
+  | "/" { SLASH }
   | "(" { LPAREN }
   | ")" { RPAREN }
   | "{" { LCURLY }

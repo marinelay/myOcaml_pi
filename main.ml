@@ -6,6 +6,7 @@ open Solve
 
 let prog : program -> unit
 = fun p1 ->
+  let _ = init_algo () in
   let _ = init_sym_cnt () in 
   let r1 = eval_exp p1 empty_env TRUE TRUE TRUE in
   (*let rv1 = list_simplify !empty_algo in*)
@@ -50,6 +51,7 @@ let main () =
     print_endline "====== result ======";
     run exp;
     prog exp;
+    
     
   with Lexer.LexicalError -> print_endline (!src ^ ": Lexical Error")
 
