@@ -30,8 +30,10 @@
 %token COMMA
 %token IMPLY
 %token NOTEQ
+%token BAR
 
 %token EXIST, FORALL
+%token PAR
 %token DOT
 
 
@@ -64,7 +66,7 @@ stmt:
   | LPAREN RPAREN { Calc.UNIT }
   | AT bexp FOR LPAREN assign SEMI exp SEMI assign RPAREN LCURLY stmt RCURLY { Calc.FOR ($2, $5, $7, $9, $12) }
   | RETURN bool SEMI { Calc.RETURN $2 }
-  | AT bexp RETURN ID LPAREN exps RPAREN SEMI { Calc.RETURN_FUNC ($2, $6) }
+  | RETURN ID LPAREN exps RPAREN SEMI { Calc.RETURN_FUNC ($4) }
 
 exps:
   | exps COMMA exp { $1@[$3] } 
@@ -74,6 +76,7 @@ exp:
   | NUM { Calc.INT $1 }
   | bexp { $1 }
   | ID { Calc.VAR $1 }
+  | BAR ID BAR { Calc.BAR $2 }
   | ID LBLOCK exp RBLOCK { Calc.ARR ($1, $3)}
   | LPAREN exp RPAREN { $2 }
   | exp PLUS exp { Calc.ADD ($1, $3) }

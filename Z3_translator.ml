@@ -79,6 +79,7 @@ let rec val2expr_aux : context -> value -> Expr.expr
   | Bool b -> const_b ctx b
   | SInt id -> mk_const ctx ("alpha_" ^ string_of_int id) (int_sort ctx)
   | SBool id -> mk_const ctx ("beta_" ^ string_of_int id) (bool_sort ctx)
+  | SLen id -> mk_const ctx ("length_" ^ string_of_int id) (int_sort ctx)
   | SArith (aop, v1, v2) ->
     (match aop with
     | SADD -> add ctx (val2expr_aux ctx v1) (val2expr_aux ctx v2)
@@ -94,7 +95,9 @@ let rec val2expr_aux : context -> value -> Expr.expr
       | (i, v)::tl -> 
         (match i with 
         | Bound _ -> store_arr_value tl ctx arr_expr
-        | _ -> store_arr_value tl ctx (arr_store ctx arr_expr (val2expr_aux ctx i) (val2expr_aux ctx v))
+        | _ -> let arr_expr = store_arr_value tl ctx arr_expr in
+        
+          (arr_store ctx arr_expr (val2expr_aux ctx i) (val2expr_aux ctx v))
         )
         
       ) in let arr_expr = store_arr_value arr_list ctx arr_expr in
@@ -135,6 +138,7 @@ let rec expr2val : Expr.expr -> bound_env -> value
       | [hd; tl] ->
         if hd = "alpha" then SInt (int_of_string tl)
         else if hd = "beta" then SBool (int_of_string tl)
+        else if hd = "length" then SLen (int_of_string tl)
         else if hd = "bound" then Bound (int_of_string tl)
         else raise (Failure "SHOULD NOT COME HERE")
       | _ -> raise (Failure "SHOULD NOT COME HERE")
@@ -263,6 +267,7 @@ let rec expr2path : Expr.expr -> bound_env -> path_cond
       | [hd; tl] ->
         if hd = "alpha" then SInt (int_of_string tl)
         else if hd = "beta" then SBool (int_of_string tl)
+        else if hd = "length" then SLen (int_of_string tl)
         else if hd = "bound" then Bound (int_of_string tl)
         else raise (Failure "SHOULD NOT COME HERE")
       | _ -> raise (Failure "SHOULD NOT COME HERE")

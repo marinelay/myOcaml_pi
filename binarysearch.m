@@ -1,4 +1,4 @@
-@ 0 <= l and forall i,j. ((l<= i and i <= j and j<=u) -> a[i] <= a[j])
+@ 0 <= l and u < |a| and forall i,j. ((l<= i and i <= j and j<=u) -> a[i] <= a[j])
 @ exist i. (l<=i and i<=u and a[i] = e)
 BinarySearch (int a[], int l, int u, int e) {
     if (l > u) { return false;}

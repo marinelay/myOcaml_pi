@@ -33,12 +33,20 @@ let rec solve : context -> solver -> (value * path_cond * env) list -> bool
       let (v, pi, env) = tup in
       (*let eq_value = Z3_translator.eq ctx r (val2expr_aux ctx v) in (* ?? *)*)
       let exp_pi = path2expr_aux ctx pi in
+
+      
+
       let not_exp_pi = not_b ctx exp_pi in
-      let tmp = Expr.simplify not_exp_pi None in
-      print_endline(Expr.to_string exp_pi);
+      
       (*let exp = Z3_translator.and_b ctx eq_value exp_pi in*)
       let a1 = Z3.Boolean.mk_true ctx in 
-      let result = eq ctx tmp a1 in
+      let result = eq ctx not_exp_pi a1 in
+      let result = Expr.simplify result None in
+
+      print_endline("---- expression ----");
+      print_endline(Expr.to_string (Expr.simplify result None));
+      print_endline("--------------------");
+
       let _ = Z3.Solver.add solver [result] in
       let partial = (match (check solver []) with
       
@@ -49,8 +57,8 @@ let rec solve : context -> solver -> (value * path_cond * env) list -> bool
         | Some m -> print_endline (Z3.Model.to_string m); false
         | _ -> raise (Failure "never happen"))
       ) in
-      (*Z3_translator.and_b ctx (path2expr_aux ctx partial) rst*)
       print_endline(string_of_bool partial);
+      (*Z3_translator.and_b ctx (path2expr_aux ctx partial) rst*)
       partial && rst
     ) l1 (Z3_translator.const_b ctx true) in
     (*let expr = Z3_translator.not_b ctx expr in*)

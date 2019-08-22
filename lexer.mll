@@ -27,6 +27,8 @@
     ; ("EXIST", EXIST)
     ; ("forall", FORALL)
     ; ("FORALL", FORALL)
+    ; ("PAR", PAR)
+    ; ("par", PAR)
   ]
 }
 
@@ -46,6 +48,7 @@ rule start = parse
   | "+" { PLUS }
   | "-" {MINUS}
   | "/" { SLASH }
+  | "|" { BAR }
   | "(" { LPAREN }
   | ")" { RPAREN }
   | "{" { LCURLY }

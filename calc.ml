@@ -6,6 +6,7 @@ and exp =
   | INT of int
   | TRUE | FALSE
   | VAR of var
+  | BAR of var
   | ARR of var * exp
   | IF of exp * exp * exp
   | ADD of exp * exp
@@ -25,10 +26,13 @@ and exp =
   | FUNC_START of exp * exp list * exp * exp
   | FOR of exp * exp * exp * exp * exp
   | RETURN of exp
-  | RETURN_FUNC of exp list * exp list
+  | RETURN_FUNC of exp list
+  
 
   | EXIST of var list * exp
   | FORALL of var list * exp
+
+  | PAR of var list
 and var = string
 ;;
 
@@ -38,6 +42,7 @@ type value =
   | Bool of bool
   (* symbol *)
   | SInt of id
+  | SLen of id
   | SBool of id
   | SArr of id * (value * value) list (* id, (index, value) *)
   | SSelect of value * value (* SArr, index *)
@@ -123,6 +128,7 @@ let rec value2str : value -> string
   | Bool b -> string_of_bool b
   | SInt id -> "alpha" ^ string_of_int id
   | SBool id -> "beta" ^ string_of_int id
+  | SLen id -> "length(" ^ string_of_int id ^ ")"
   | SSelect (arr, i) -> "array" ^ string_of_int (get_arr_id arr) ^ "[" ^ value2str i ^ "]" 
 
     
@@ -182,6 +188,12 @@ let rec eval_exp : exp -> env -> path_cond -> exp -> exp -> (value * path_cond *
   | TRUE -> [(Bool true, pi, env)]
   | FALSE -> [(Bool false, pi, env)]
   | VAR v -> [(apply_env env v, pi, env)]
+  | BAR v -> 
+    let arr = apply_env env v in
+    (match arr with
+    | SArr (id, _) -> [(SLen id, pi, env)]
+    | _ -> raise(Failure "None in arr")
+    )
   | ARR (x, i) -> 
     let l = eval_exp i env pi pre post in
     eval_exp_aux l (fun w pi env ->
@@ -467,10 +479,15 @@ let rec eval_exp : exp -> env -> path_cond -> exp -> exp -> (value * path_cond *
                       )
                       
         ) in let env = args_to_value args (!func_args) env in
-          let post_exp = eval_exp post env TRUE pre post in
-          eval_exp_aux post_exp (fun v pi_post env_post ->
-            let _ = append_algo [(Return, IMPLY(pi, IMPLY(pi_post, pi_before_post)), env)] in
-            eval_exp UNIT env FALSE pre post
+          let pre_exp = eval_exp pre env TRUE pre post in
+          eval_exp_aux pre_exp (fun v pi_pre env_pre ->
+            let _ = append_algo [(Return, IMPLY(pi, pi_pre), env)] in
+
+            let post_exp = eval_exp post env TRUE pre post in
+            eval_exp_aux post_exp (fun v pi_post env_post ->
+              let _ = append_algo [(Return, IMPLY(pi, IMPLY(pi_post, pi_before_post)), env)] in
+              eval_exp UNIT env FALSE pre post
+            )
           )
     )
 
@@ -480,16 +497,16 @@ let rec eval_exp : exp -> env -> path_cond -> exp -> exp -> (value * path_cond *
     | [] -> env
     | hd::tl -> is_there_bound_var tl (append_env env (hd, Bound (new_sym())))
     ) in
-    let env = is_there_bound_var v env in
-      let body = eval_exp conds env pi pre post in
-        eval_exp_aux body (fun w pi2 env ->
+    let env_bound = is_there_bound_var v env in
+      let body = eval_exp conds env_bound pi pre post in
+        eval_exp_aux body (fun w pi2 env_bound ->
           let rec bound_var_list = fun l env ->
           (match l with
           | [] -> []
           | hd::tl ->
           (apply_env env hd)::(bound_var_list tl env)
           ) in
-          [(Bool true, IMPLY(pi, QUAN_ALL(bound_var_list v env, pi2)), env)]
+          [(Bool true, IMPLY(pi, QUAN_ALL(bound_var_list v env_bound, pi2)), env)]
         )
         
 
@@ -499,13 +516,29 @@ let rec eval_exp : exp -> env -> path_cond -> exp -> exp -> (value * path_cond *
     | [] -> env
     | hd::tl -> is_there_bound_var tl (append_env env (hd, Bound (new_sym())))
     ) in
-    let env = is_there_bound_var v env in
-      let body = eval_exp conds env pi pre post in
-      eval_exp_aux body (fun w pi2 env ->
+    let env_bound = is_there_bound_var v env in
+      let body = eval_exp conds env_bound pi pre post in
+      eval_exp_aux body (fun w pi2 env_bound ->
           let rec bound_var_list = fun l env ->
           (match l with
           | [] -> []
           | hd::tl -> (apply_env env hd)::(bound_var_list tl env)
           ) in
-          [(Bool true, IMPLY(pi, QUAN_EXIST(bound_var_list v env, pi2)), env)]
+          [(Bool true, IMPLY(pi, QUAN_EXIST(bound_var_list v env_bound, pi2)), env)]
       )
+
+  (*| PAR (v) ->
+    let quant = [i; j] in
+    let rec is_there_bound_var = fun l env ->
+    (match l with
+    | [] -> env
+    | hd::tl -> is_there_bound_var tl (append_env env (hd, Bound (new_sym())))
+    ) in
+    let env_bound = is_there_bound_var quant env in
+      let body = eval_exp conds env_bound pi pre post in
+      eval_exp_aux body (fun w pi2 env_bound ->
+          let rec bound_var_list = fun l env ->
+          (match l with
+          | [] -> []
+          | hd::tl -> (apply_env env hd)::(bound_var_list tl env)
+          ) in*)
