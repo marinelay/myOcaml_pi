@@ -31,6 +31,8 @@
 %token IMPLY
 %token NOTEQ
 %token BAR
+%token COLON
+%token TOTAL
 
 %token EXIST, FORALL
 %token PAR
@@ -64,7 +66,9 @@ stmt:
   | IF LPAREN exp RPAREN LCURLY stmt RCURLY ELSE LCURLY stmt RCURLY  { Calc.IF ($3, $6, $10) }
   | IF LPAREN exp RPAREN LCURLY stmt RCURLY { Calc.IF ($3, $6, Calc.UNIT) }
   | LPAREN RPAREN { Calc.UNIT }
-  | AT bexp FOR LPAREN assign SEMI exp SEMI assign RPAREN LCURLY stmt RCURLY { Calc.FOR ($2, $5, $7, $9, $12) }
+  | AT bexp TOTAL COLON LPAREN exps RPAREN
+    FOR LPAREN assign SEMI exp SEMI assign RPAREN LCURLY stmt RCURLY 
+    { Calc.FOR ($2, $6, $10, $12, $14, $17) }
   | RETURN bool SEMI { Calc.RETURN $2 }
   | RETURN ID LPAREN exps RPAREN SEMI { Calc.RETURN_FUNC ($4) }
 

@@ -29,6 +29,7 @@
     ; ("FORALL", FORALL)
     ; ("PAR", PAR)
     ; ("par", PAR)
+    ; ("T", TOTAL)
   ]
 }
 
@@ -64,6 +65,7 @@ rule start = parse
   | ">=" { GE }
   | "=" { EQUAL }
   | ":=" { COLEQ }
+  | ":" { COLON }
   | ";" { SEMI }
   | "," { COMMA }
   | "." { DOT }

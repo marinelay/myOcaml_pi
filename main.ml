@@ -6,16 +6,24 @@ open Solve
 
 let prog : program -> unit
 = fun p1 ->
-  let _ = init_algo () in
+  let _ = init_partial () in
   let _ = init_sym_cnt () in 
   let r1 = eval_exp p1 empty_env TRUE TRUE TRUE in
-  (*let rv1 = list_simplify !empty_algo in*)
+  (*let rv1 = list_simplify !partial_correct in*)
   let ctx = Z3_translator.new_ctx () in
   let solver = Z3.Solver.mk_solver ctx None in
 
-  match Solve.solve ctx solver !empty_algo with
-  | true -> print_endline ("Correct")
-  | false -> print_endline ("Fail") 
+  let _ = match Solve.solve ctx solver !partial_correct with
+  | true -> print_endline ("Partial Correct")
+  | false -> print_endline ("Partial Fail")
+
+  in let _ = init_total() in
+  let ctx = Z3_translator.new_ctx () in
+  let solver = Z3.Solver.mk_solver ctx None in
+
+  match Solve.total_solve ctx solver !total_correct with
+  | true -> print_endline ("Total Correct")
+  | false -> print_endline ("Total Fail")
 
 let run : program -> unit
 = fun pgm ->
@@ -29,7 +37,7 @@ let run : program -> unit
             print_endline ("value: " ^ value2str (simplify_val (v)));
             print_newline ();
             print_aux tl (cnt + 1)
-    in let r = eval_exp pgm empty_env TRUE TRUE TRUE in print_aux !empty_algo 1
+    in let r = eval_exp pgm empty_env TRUE TRUE TRUE in print_aux !partial_correct 1
     
 
 let main () =

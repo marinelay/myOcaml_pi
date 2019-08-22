@@ -24,7 +24,7 @@ and exp =
   | ASSIGN_ARR of var * exp * exp
   | SEQ of exp * exp
   | FUNC_START of exp * exp list * exp * exp
-  | FOR of exp * exp * exp * exp * exp
+  | FOR of exp * exp list * exp * exp * exp * exp
   | RETURN of exp
   | RETURN_FUNC of exp list
   
@@ -57,7 +57,6 @@ and arith_op = SADD | SSUB | SDIV
 and id = int
 and env = (var * value) list
 
-
 and sym_exp =
   | TRUE | FALSE
   | NOT of sym_exp
@@ -81,16 +80,28 @@ and path_cond = sym_exp
 let func_args = ref []
 let append_args arg = func_args := !func_args@arg
 
-let empty_algo = ref []
-let init_algo () = empty_algo := []
-let append_algo algo = empty_algo := !empty_algo@algo
+let partial_correct = ref []
+let init_partial () = partial_correct := []
+let append_partial partial = partial_correct := !partial_correct@partial
+
+let total_correct : (value list) list ref  = ref [] (* why can't []? *)
+let init_total () = total_correct := []
+let append_total total = total_correct := total::(!total_correct)
+
+let rec get_total total env =
+  (match total with
+  | [] -> []
+  | hd::tl -> 
+    let [(v, _, _)] = eval_exp hd env TRUE TRUE TRUE in
+    v::(get_total tl)
 
 let sym_cnt = ref 0
 let init_sym_cnt () = sym_cnt := 0
 let new_sym () = sym_cnt := !sym_cnt + 1; !sym_cnt
 
-let empty_env = []
 
+
+let empty_env = []
 
 let rec append_env env (x, v) 
 = (x, v)::env
@@ -111,7 +122,7 @@ let rec get_arr_value : value -> value -> value = fun arr i ->
     | [] -> None
     | hd::tl ->  
       (match hd with
-      | (j, w) -> if j=i then w else find_index tl i
+      | (j, w) -> if j=i then SSelect (arr, j) else find_index tl i
       )
     ) in find_index arr_list i
 
@@ -200,7 +211,7 @@ let rec eval_exp : exp -> env -> path_cond -> exp -> exp -> (value * path_cond *
       let v = get_arr_value (apply_env env x) w in
       (match v with
       | None -> 
-        let env = append_arr env (x, w, SInt (new_sym())) in (* 없을시 새로등록 *)
+        let env = append_arr env (x, w, None) in (* 없을시 새로등록 *)
         [(SSelect(apply_env env x, w), pi, env)]
       | _ -> [(SSelect(apply_env env x, w), pi, env)]
       )
@@ -215,8 +226,7 @@ let rec eval_exp : exp -> env -> path_cond -> exp -> exp -> (value * path_cond *
           let l2 = eval_exp body2 env (AND(pi, NOT(pi1))) pre post in
           eval_exp_aux l2 (fun v2 pi_false env_false ->
             (match v1, v2 with
-            | Unit, _ -> [(v2, pi_false, env_false)]
-            | _, Unit -> [(v1, pi_true, env_true)]
+            | _, Unit -> [(v1, pi_true, env_true); (v2, pi_false, env_false)]
             | _, _ -> [(v1, pi_true, env_true); (v2, pi_false, env_false)]
             )
           )
@@ -427,32 +437,36 @@ let rec eval_exp : exp -> env -> path_cond -> exp -> exp -> (value * path_cond *
           )
 
   (* 배열 추가 필요 - 1차 추가 완료*)
-  | FOR (pre, init, cond, next, body) ->
+  | FOR (pre, total, init, cond, next, body) ->
+    (* Total Correctness *)
+    let total_list = get_total total env in
+    let _ = append_total total_list in
+    
+    (* Partial Correctness *)
     let post_for = pre in
-    (* Partial Correctenss *)
     let init_exp = eval_exp init env pi pre post in
     eval_exp_aux init_exp (fun v_init pi_init env_init ->
       let pre_exp = eval_exp pre env_init TRUE pre post in
       eval_exp_aux pre_exp (fun v_pre pi_pre env_pre ->
-        let _ = append_algo [(Bool true, IMPLY(pi_init, pi_pre), env_init)] in
+        let _ = append_partial [(Bool true, IMPLY(pi_init, pi_pre), env_init)] in
         let pre_exp = eval_exp pre env TRUE pre post in
         eval_exp_aux pre_exp (fun v_pre pi_pre env_pre ->
-        let cond_exp = eval_exp cond env pi_pre pre post in
-        eval_exp_aux cond_exp (fun v_cond pi_cond env_cond ->
-          (* Cond is true *)
-          let body_exp = eval_exp body env_cond pi_cond pre post in
-          eval_exp_aux body_exp (fun v_body pi_body env_body ->
-            let next_exp = eval_exp next env_body pi_body pre post in
-            eval_exp_aux next_exp (fun v_next pi_next env_next ->
-              let post_exp = eval_exp post_for env_next TRUE pre post in
-              eval_exp_aux post_exp (fun v_post pi_post env_post ->
-                let _ = append_algo [(Bool true, IMPLY(pi_next, pi_post), env_post)] in
-                (* Cond is false *) 
-                eval_exp UNIT env_cond (AND(pi_pre, NOT (pi_cond))) pre post
+          let cond_exp = eval_exp cond env pi_pre pre post in
+          eval_exp_aux cond_exp (fun v_cond pi_cond env_cond ->
+            (* Cond is true *)
+            let body_exp = eval_exp body env_cond pi_cond pre post in
+            let _ = eval_exp_aux body_exp (fun v_body pi_body env_body ->
+              let next_exp = eval_exp next env_body pi_body pre post in
+              eval_exp_aux next_exp (fun v_next pi_next env_next ->
+                let post_exp = eval_exp post_for env_next TRUE pre post in
+                  eval_exp_aux post_exp (fun v_post pi_post env_post ->
+                  let _ = append_partial [(Bool true, IMPLY(pi_next, pi_post), env_post)] in
+                  eval_exp UNIT env_cond TRUE pre post (* Dummy *)
+                ) 
               )
-            )
-          )
-        )
+            ) in (* Cond is false *)
+            eval_exp UNIT env_cond (AND(pi_pre, NOT (pi_cond))) pre post
+          ) 
         )
       )
     )
@@ -460,7 +474,7 @@ let rec eval_exp : exp -> env -> path_cond -> exp -> exp -> (value * path_cond *
   | RETURN (b) ->
         let l2 = eval_exp post env TRUE pre post in
         eval_exp_aux l2 (fun v1 post_exp env -> 
-          let _ = append_algo [(Return, IMPLY(pi, (if b = TRUE then post_exp else NOT post_exp)), env)] in
+          let _ = append_partial [(Return, IMPLY(pi, (if b = TRUE then post_exp else NOT post_exp)), env)] in
           eval_exp UNIT env FALSE pre post
         )
 
@@ -481,11 +495,11 @@ let rec eval_exp : exp -> env -> path_cond -> exp -> exp -> (value * path_cond *
         ) in let env = args_to_value args (!func_args) env in
           let pre_exp = eval_exp pre env TRUE pre post in
           eval_exp_aux pre_exp (fun v pi_pre env_pre ->
-            let _ = append_algo [(Return, IMPLY(pi, pi_pre), env)] in
+            let _ = append_partial [(Return, IMPLY(pi, pi_pre), env)] in
 
             let post_exp = eval_exp post env TRUE pre post in
             eval_exp_aux post_exp (fun v pi_post env_post ->
-              let _ = append_algo [(Return, IMPLY(pi, IMPLY(pi_post, pi_before_post)), env)] in
+              let _ = append_partial [(Return, IMPLY(pi, IMPLY(pi_post, pi_before_post)), env)] in
               eval_exp UNIT env FALSE pre post
             )
           )

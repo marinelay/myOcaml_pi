@@ -95,11 +95,14 @@ let rec val2expr_aux : context -> value -> Expr.expr
       | (i, v)::tl -> 
         (match i with 
         | Bound _ -> store_arr_value tl ctx arr_expr
-        | _ -> let arr_expr = store_arr_value tl ctx arr_expr in
-        
-          (arr_store ctx arr_expr (val2expr_aux ctx i) (val2expr_aux ctx v))
+        | _ ->
+          (match v with
+          | None -> store_arr_value tl ctx arr_expr
+          | _ ->
+            let arr_expr = store_arr_value tl ctx arr_expr in
+            (arr_store ctx arr_expr (val2expr_aux ctx i) (val2expr_aux ctx v))
+          )
         )
-        
       ) in let arr_expr = store_arr_value arr_list ctx arr_expr in
       arr_select ctx arr_expr (val2expr_aux ctx i)
 

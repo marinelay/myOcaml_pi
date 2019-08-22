@@ -20,6 +20,37 @@ let sat_check : path_cond -> bool
   | UNSATISFIABLE -> false
   | UNKNOWN -> false
   | SATISFIABLE -> true
+
+let rec total_solve : context -> solver -> (value list) list -> bool
+= fun ctx solver l1 ->
+  
+  let rec solve l1 =
+    match l1 with
+    | hd::tl -> true
+    | hd1::hd2::tl -> 
+      let rec compare hd1 hd2 =
+        (match hd1, hd2 with
+        | [], [] -> false
+        | hd1::tl1, hd2::tl2 ->
+          let formula = eq ctx (val2expr hd1) (val2expr hd2) in
+          let _ = Z3.Solver.add solver [formula] in
+          (match (check solver []) with
+            | UNSATISFIABLE ->
+              let _ = Z3.Solver.reset solver in
+              let formula = lt ctx (val2expr hd1) (val2expr hd2) in
+              let _ = Z3.Solver.add solver [formula] in
+              (match (check solver []) with
+                | UNSATISFIABLE -> false
+                | _ -> true
+              )
+            | _ -> compare tl1 tl2    
+          )
+        ) in let result = (compare hd1 hd2) in
+        if result then (solve (hd2::tl)) else raise(Failure "Total is Fail")
+    | _ -> raise(Failure"?")
+  in solve l1 
+      
+
 let rec solve : context -> solver -> (value * path_cond * env) list -> bool
 = fun ctx solver l1 ->
   let r = Z3_translator.mk_const ctx "return" (Z3_translator.int_sort ctx) in
@@ -34,7 +65,9 @@ let rec solve : context -> solver -> (value * path_cond * env) list -> bool
       (*let eq_value = Z3_translator.eq ctx r (val2expr_aux ctx v) in (* ?? *)*)
       let exp_pi = path2expr_aux ctx pi in
 
-      
+      print_endline("---- expression ----");
+      print_endline(Expr.to_string (Expr.simplify exp_pi None));
+      print_endline("--------------------");
 
       let not_exp_pi = not_b ctx exp_pi in
       
@@ -43,9 +76,7 @@ let rec solve : context -> solver -> (value * path_cond * env) list -> bool
       let result = eq ctx not_exp_pi a1 in
       let result = Expr.simplify result None in
 
-      print_endline("---- expression ----");
-      print_endline(Expr.to_string (Expr.simplify result None));
-      print_endline("--------------------");
+      
 
       let _ = Z3.Solver.add solver [result] in
       let partial = (match (check solver []) with
