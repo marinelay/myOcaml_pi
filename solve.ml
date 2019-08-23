@@ -21,7 +21,7 @@ let sat_check : path_cond -> bool
   | UNKNOWN -> false
   | SATISFIABLE -> true
 
-let rec total_solve : context -> solver -> (value list * path_cond) list -> bool
+let rec total_solve : context -> solver -> ((value list * path_cond) list) list -> bool
 = fun ctx solver l1 ->
   
   let rec solve l1 =

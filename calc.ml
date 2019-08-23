@@ -84,10 +84,10 @@ let partial_correct = ref []
 let init_partial () = partial_correct := []
 let append_partial partial = partial_correct := !partial_correct@partial
 
-let total_correct : (value list * path_cond) list ref  = ref [] (* why can't []? *)
+let total_correct : ((value list * path_cond) list) list ref  = ref [] (* why can't []? *)
 let init_total () = total_correct := []
-let append_total : value list -> path_cond -> unit
-= fun total pi -> total_correct := (!total_correct)@[(total, pi)]
+let append_total : (value list * path_cond) list -> unit
+= fun total -> total_correct := (!total_correct)@[total]
 
 
 
@@ -215,12 +215,12 @@ let rec eval_exp : exp -> env -> path_cond -> exp -> exp -> path_cond -> (value 
     )
   
   | IF (cond, body1, body2) ->
-    let l = eval_exp cond env TRUE pre post total in
-      eval_exp_aux l (fun v pi1 env total ->
+    let l = eval_exp cond env TRUE pre post TRUE in
+      eval_exp_aux l (fun v pi1 env total1 ->
 
-        let l1 = eval_exp body1 env (AND(pi, pi1)) pre post total in
+        let l1 = eval_exp body1 env (AND(pi, pi1)) pre post (AND(total, total1)) in
         eval_exp_aux l1 (fun v1 pi_true env_true total_true ->
-          let l2 = eval_exp body2 env (AND(pi, NOT(pi1))) pre post total in
+          let l2 = eval_exp body2 env (AND(pi, NOT(pi1))) pre post (AND(total, NOT(total1))) in
           eval_exp_aux l2 (fun v2 pi_false env_false total_false ->
             (match v1, v2 with
             | _, Unit -> [(v1, pi_true, env_true, total_true); (v2, pi_false, env_false, total_false)]
@@ -277,98 +277,98 @@ let rec eval_exp : exp -> env -> path_cond -> exp -> exp -> path_cond -> (value 
             (match (v1, v2) with
             | Bool _, _ | SBool _, _
             | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : LT")
-            | Int n1, Int n2 -> [(Bool (n1 = n2), AND(pi, if n1=n2 then TRUE else FALSE), env, total)]
-            | _ -> [(Bool true, AND(pi, EQ(v1, v2)), env, total)]
+            | Int n1, Int n2 -> [(Bool (n1 = n2), AND(pi, if n1=n2 then TRUE else FALSE), env, AND(total, if n1=n2 then TRUE else FALSE))]
+            | _ -> [(Bool true, AND(pi, EQ(v1, v2)), env, AND(total, EQ(v1, v2)))]
             )
           )
       )
 
   | NOTEQUAL (e1, e2) ->
     let l1 = eval_exp e1 env pi pre post total in
-      eval_exp_aux l1 (fun v1 pi1 env total ->
+      eval_exp_aux l1 (fun v1 pi1 env total1 ->
         let l2 = eval_exp e2 env pi pre post total in
-          eval_exp_aux l2 (fun v2 pi2 env total ->
+          eval_exp_aux l2 (fun v2 pi2 env total2 ->
             (match (v1, v2) with
             | Bool _, _ | SBool _, _
             | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : LT")
-            | Int n1, Int n2 -> [(Bool (n1 != n2), AND(pi, if n1!=n2 then TRUE else FALSE), env, total)]
-            | _ -> [(Bool true, AND(pi, NOTEQ(v1, v2)), env, total)]
+            | Int n1, Int n2 -> [(Bool (n1 != n2), AND(pi, if n1!=n2 then TRUE else FALSE), env, AND(total, if n1!=n2 then TRUE else FALSE))]
+            | _ -> [(Bool true, AND(pi, NOTEQ(v1, v2)), env, AND(pi, NOTEQ(v1, v2)))]
             )
           )
       )
 
   | LT (e1, e2) ->
     let l1 = eval_exp e1 env pi pre post total in
-      eval_exp_aux l1 (fun v1 pi1 env total ->
+      eval_exp_aux l1 (fun v1 pi1 env total1 ->
         let l2 = eval_exp e2 env pi pre post total in
-          eval_exp_aux l2 (fun v2 pi2 env total ->
+          eval_exp_aux l2 (fun v2 pi2 env total2 ->
 
             (match (v1, v2) with
             | Bool _, _ | SBool _, _
             | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : LT")
             | Int n1, Int n2 -> [(Bool (n1 < n2), pi, env, total)]
-            | _ -> [(Bool true, AND(pi, LESSTHAN(v1, v2)), env, total)]
+            | _ -> [(Bool true, AND(pi, LESSTHAN(v1, v2)), env, AND(total, LESSTHAN(v1, v2)))]
             )
           )
       )
   | LE (e1, e2) ->
     let l1 = eval_exp e1 env pi pre post total in
-      eval_exp_aux l1 (fun v1 pi1 env total ->
+      eval_exp_aux l1 (fun v1 pi1 env total1 ->
         let l2 = eval_exp e2 env pi pre post total in
-          eval_exp_aux l2 (fun v2 pi2 env total ->
+          eval_exp_aux l2 (fun v2 pi2 env total2 ->
             (match (v1, v2) with
             | Bool _, _ | SBool _, _
             | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : LE")
             | Int n1, Int n2 -> [(Bool (n1 <= n2), pi, env, total)]
-            | _ -> [(Bool true, AND(pi, LESSEQUAL(v1, v2)), env, total)]
+            | _ -> [(Bool true, AND(pi, LESSEQUAL(v1, v2)), env, AND(total, LESSEQUAL(v1, v2)))]
             )
           )
       )
   | GT (e1, e2) ->
     let l1 = eval_exp e1 env pi pre post total in
-      eval_exp_aux l1 (fun v1 pi1 env total ->
+      eval_exp_aux l1 (fun v1 pi1 env total1 ->
         let l2 = eval_exp e2 env pi pre post total in
-          eval_exp_aux l2 (fun v2 pi2 env total ->
+          eval_exp_aux l2 (fun v2 pi2 env total2 ->
             (match (v1, v2) with
               | Bool _, _ | SBool _, _
               | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : GT")
               | Int n1, Int n2 -> [(Bool (n1 > n2), pi, env, total)]
-              | _ -> [(Bool true, AND(pi, GREATTHAN(v1, v2)), env, total)]
+              | _ -> [(Bool true, AND(pi, GREATTHAN(v1, v2)), env, AND(total, GREATTHAN(v1, v2)))]
             )
           )
       )
   | GE (e1, e2) ->
     let l1 = eval_exp e1 env pi pre post total in
-      eval_exp_aux l1 (fun v1 pi1 env total ->
+      eval_exp_aux l1 (fun v1 pi1 env total1 ->
         let l2 = eval_exp e2 env pi pre post total in
-          eval_exp_aux l2 (fun v2 pi2 env total ->
+          eval_exp_aux l2 (fun v2 pi2 env total2 ->
             (match (v1, v2) with
             | Bool _, _ | SBool _, _
             | _, Bool _ | _, SBool _ -> raise(Failure "Type Error : GE")
             | Int n1, Int n2 -> [(Bool (n1 >= n2), pi, env, total)]
-            | _ -> [(Bool true, AND(pi, GREATEQUAL(v1, v2)), env, total)]
+            | _ -> [(Bool true, AND(pi, GREATEQUAL(v1, v2)), env, AND(total, GREATEQUAL(v1, v2)))]
             )
           )
       )
 
   | AND_EXP (e1, e2) ->
-    let l1 = eval_exp e1 env TRUE pre post total in
-    eval_exp_aux l1 (fun v1 pi1 env total -> 
-      let l2 = eval_exp e2 env TRUE pre post total in
-      eval_exp_aux l2 (fun v2 pi2 env total ->
+    let l1 = eval_exp e1 env pi pre post total in
+    eval_exp_aux l1 (fun v1 pi1 env total1 -> 
+      let l2 = eval_exp e2 env pi pre post total in
+      eval_exp_aux l2 (fun v2 pi2 env total2 ->
             (match (v1, v2) with
-            | _ -> [(Bool true, AND(pi, AND(pi1, pi2)), env, total)]
+            | _ -> [(Bool true, AND(pi, AND(pi1, pi2)), env, AND(total, IMPLY(total1, total2)))]
             )
       )
     )
     
   | IMPLY_EXP (e1, e2) ->
-    let l1 = eval_exp e1 env TRUE pre post total in
-    eval_exp_aux l1 (fun v1 pi1 env total -> 
-      let l2 = eval_exp e2 env TRUE pre post total in
-      eval_exp_aux l2 (fun v2 pi2 env total ->
+    let l1 = eval_exp e1 env TRUE pre post TRUE in
+    eval_exp_aux l1 (fun v1 pi1 env total1 -> 
+      let l2 = eval_exp e2 env TRUE pre post TRUE in
+      eval_exp_aux l2 (fun v2 pi2 env total2 ->
             (match (v1, v2) with
-            | _ -> [(Bool true, AND(pi, IMPLY(pi1, pi2)), env, total)]
+            | _ -> [(Bool true, AND(pi, IMPLY(pi1, pi2)), env, AND(total, IMPLY(total1, total2)))]
             )
       )
     )
@@ -448,7 +448,8 @@ let rec eval_exp : exp -> env -> path_cond -> exp -> exp -> path_cond -> (value 
     let total_pi = eval_exp total_pre env TRUE TRUE TRUE total in
     let _ = eval_exp_aux total_pi (fun v total_pi total_env total ->
       let total_list = get_total total_exp total_env in
-      let _ = append_total total_list (AND(total_pi, total)) in
+      let total_pi = AND(total_pi, total) in
+      let _ = append_total [(total_list, total_pi)] in
       eval_exp UNIT env TRUE pre post total (* Dummy *)
     ) in
     
@@ -458,26 +459,28 @@ let rec eval_exp : exp -> env -> path_cond -> exp -> exp -> path_cond -> (value 
     let init_exp = eval_exp init env pi pre post TRUE in
     eval_exp_aux init_exp (fun v_init pi_init env_init total ->
       let pre_exp = eval_exp pre env_init TRUE pre post total in
-      eval_exp_aux pre_exp (fun v_pre pi_pre env_pre total ->
+      eval_exp_aux pre_exp (fun v_pre pi_pre env_pre _ ->
         let _ = append_partial [(Bool true, IMPLY(pi_init, pi_pre), env_init)] in
         let pre_exp = eval_exp pre env TRUE pre post total in
-        eval_exp_aux pre_exp (fun v_pre pi_pre env_pre total ->
-          let cond_exp = eval_exp cond env TRUE pre post total in
+        eval_exp_aux pre_exp (fun v_pre pi_pre env_pre _ ->
+          let cond_exp = eval_exp cond env pi_pre pre post total in
           eval_exp_aux cond_exp (fun v_cond pi_cond env_cond total->
             (* Cond is true *)
-            let body_exp = eval_exp body env_cond (AND (pi_pre, pi_cond)) pre post (AND (pi_cond, total)) in
+            let total_body_list = ref [] in
+
+            let body_exp = eval_exp body env_cond pi_cond pre post total in
             let _ = eval_exp_aux body_exp (fun v_body pi_body env_body total->
-              let body_exp = eval_exp body env_cond (AND (pi_pre, pi_cond)) pre post (AND (pi_cond, total)) in
               let next_exp = eval_exp next env_body pi_body pre post total in
               eval_exp_aux next_exp (fun v_next pi_next env_next total ->
                 let post_exp = eval_exp post_for env_next TRUE pre post total in
-                  eval_exp_aux post_exp (fun v_post pi_post env_post total ->
+                  eval_exp_aux post_exp (fun v_post pi_post env_post _ ->
 
                   (* Total *)
                   let total_pi = eval_exp total_pre env TRUE TRUE TRUE total in
                   let _ = eval_exp_aux total_pi (fun v total_pi total_env total ->
                     let total_list = get_total total_exp total_env in
-                    let _ = append_total total_list (AND(total_pi, total)) in
+                    let total_pi = AND(total_pi, total) in
+                    let _ = total_body_list := !total_body_list@[(total_list, total_pi)] in
                     eval_exp UNIT env TRUE pre post total (* Dummy *)
                   ) in
 
@@ -486,7 +489,10 @@ let rec eval_exp : exp -> env -> path_cond -> exp -> exp -> path_cond -> (value 
                   eval_exp UNIT env_cond TRUE pre post total (* Dummy *)
                 ) 
               )
-            ) in (* Cond is false *)
+            ) in 
+            (* Add Total *)
+            let _ = append_total !total_body_list in
+            (* Cond is false *)
             eval_exp UNIT env_cond (AND(pi_pre, NOT (pi_cond))) pre post (AND (NOT (pi_cond), total))
           ) 
         )
