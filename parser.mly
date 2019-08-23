@@ -66,9 +66,9 @@ stmt:
   | IF LPAREN exp RPAREN LCURLY stmt RCURLY ELSE LCURLY stmt RCURLY  { Calc.IF ($3, $6, $10) }
   | IF LPAREN exp RPAREN LCURLY stmt RCURLY { Calc.IF ($3, $6, Calc.UNIT) }
   | LPAREN RPAREN { Calc.UNIT }
-  | AT bexp TOTAL COLON LPAREN exps RPAREN
+  | AT bexp TOTAL COLON LPAREN exps RPAREN BAR bexp
     FOR LPAREN assign SEMI exp SEMI assign RPAREN LCURLY stmt RCURLY 
-    { Calc.FOR ($2, $6, $10, $12, $14, $17) }
+    { Calc.FOR ($2, $6, $9, $12, $14, $16, $19) }
   | RETURN bool SEMI { Calc.RETURN $2 }
   | RETURN ID LPAREN exps RPAREN SEMI { Calc.RETURN_FUNC ($4) }
 
