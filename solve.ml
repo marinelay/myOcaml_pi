@@ -24,40 +24,76 @@ let sat_check : path_cond -> bool
 let rec total_solve : context -> solver -> ((value list * path_cond) list) list -> bool
 = fun ctx solver l1 ->
   
-  let rec solve l1 =
+  let rec solve : ((value list * path_cond) list) list -> bool =
+  fun l1 ->
+  (match l1 with
+    | hd::tl -> true
+    | before_solve::after_solve::tl ->
 
-    match l1 with
-    
-    | hd1::hd2::tl -> 
-      let rec compare hd1 hd2 =
-        (match hd1, hd2 with
-        | ([], _), ([], _) -> false
-        | (hd1::tl1, pi1), (hd2::tl2, pi2) ->
+    let rec compare : (value list * path_cond) list -> (value list * path_cond) list -> bool = fun before after ->
+    (match before, after with
+      | [], _ -> true
+      | hd1::tl1, [] -> compare tl1  after_solve
+      | hd1::tl1, hd2::tl2 ->
+        let rec compare_value : (value list * path_cond) -> (value list * path_cond) -> bool = fun before after ->
+        (match before, after with
+          | ([], _), ([], _) -> false
+          | (hd1::tl1, pi1), (hd2::tl2, pi2) ->
 
-          let formula = eq ctx (val2expr_aux ctx hd1) (val2expr_aux ctx hd2) in
-          let formula = and_b ctx (path2expr_aux ctx pi2) formula in
-          let result = Expr.simplify formula None in
-          let _ = Z3.Solver.add solver [result] in
-          print_endline(Z3.Solver.to_string solver);
-          (match (check solver []) with
-            | UNSATISFIABLE ->
-              let _ = Z3.Solver.reset solver in
-              let formula = lt ctx (val2expr hd1) (val2expr hd2) in
-              let formula = and_b ctx (path2expr_aux ctx pi2) formula in
-              let result = Expr.simplify formula None in
-              let _ = Z3.Solver.add solver [result] in
-              (match (check solver []) with
-                | UNSATISFIABLE -> false
-                | _ -> true
-              )
-            | _ -> compare (tl1, pi1) (tl2, pi2)    
-          )
-        ) in let result = (compare hd1 hd2) in
-        if result then (solve (hd2::tl)) else raise(Failure "Total is Fail")
-    | hd::tl -> true   
-    | [] -> raise(Failure"?")
-  in solve l1 
-      
+            let formula = eq ctx (val2expr_aux ctx hd1) (val2expr_aux ctx hd2) in
+            let formula = and_b ctx (path2expr_aux ctx pi2) formula in
+            let result = Expr.simplify formula None in
+            let _ = Z3.Solver.add solver [result] in
+            print_endline(Z3.Solver.to_string solver);
+            (match (check solver []) with
+              | UNSATISFIABLE ->
+                let _ = Z3.Solver.reset solver in
+                let formula = lt ctx (val2expr hd1) (val2expr hd2) in
+                let formula = and_b ctx (path2expr_aux ctx pi2) formula in
+                let result = Expr.simplify formula None in
+                let _ = Z3.Solver.add solver [result] in
+                (match (check solver []) with
+                  | UNSATISFIABLE -> false
+                  | _ -> true
+                )
+              | _ -> compare_value (tl1, pi1) (tl2, pi2) 
+            ) 
+        ) in let result = compare_value hd1 hd2 in
+        (compare tl1 tl2) && result
+        
+    ) in let result = compare before_solve after_solve in
+    (solve (after_solve::tl)) && result
+  )
+  in solve l1
+
+     (*) | hd1::hd2::tl -> 
+        let rec compare hd1 hd2 =
+          (match hd1, hd2 with
+          | ([], _), ([], _) -> false
+          | (hd1::tl1, pi1), (hd2::tl2, pi2) ->
+
+            let formula = eq ctx (val2expr_aux ctx hd1) (val2expr_aux ctx hd2) in
+            let formula = and_b ctx (path2expr_aux ctx pi2) formula in
+            let result = Expr.simplify formula None in
+            let _ = Z3.Solver.add solver [result] in
+            print_endline(Z3.Solver.to_string solver);
+            (match (check solver []) with
+              | UNSATISFIABLE ->
+                let _ = Z3.Solver.reset solver in
+                let formula = lt ctx (val2expr hd1) (val2expr hd2) in
+                let formula = and_b ctx (path2expr_aux ctx pi2) formula in
+                let result = Expr.simplify formula None in
+                let _ = Z3.Solver.add solver [result] in
+                (match (check solver []) with
+                  | UNSATISFIABLE -> false
+                  | _ -> true
+                )
+              | _ -> compare (tl1, pi1) (tl2, pi2)    
+            )
+          ) in let result = (compare hd1 hd2) in
+          if result then (solve (hd2::tl)) else raise(Failure "Total is Fail")
+      | hd::tl -> true   
+      | [] -> raise(Failure"?")*)      
 
 let rec solve : context -> solver -> (value * path_cond * env) list -> bool
 = fun ctx solver l1 ->
