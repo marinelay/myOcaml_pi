@@ -37,11 +37,13 @@ let minus ctx expr = Z3.Arithmetic.mk_unary_minus ctx expr
 let and_b ctx expr1 expr2 = Z3.Boolean.mk_and ctx [expr1; expr2]
 let or_b ctx expr1 expr2 = Z3.Boolean.mk_or ctx [expr1; expr2]
 let imply ctx expr1 expr2 = Z3.Boolean.mk_implies ctx expr1 expr2
+let xor_b ctx expr1 expr2 = Z3.Boolean.mk_xor ctx expr1 expr2
 let lt ctx expr1 expr2 = Z3.Arithmetic.mk_lt ctx expr1 expr2
 let gt ctx expr1 expr2 = Z3.Arithmetic.mk_gt ctx expr1 expr2
 let le ctx expr1 expr2 = Z3.Arithmetic.mk_le ctx expr1 expr2
 let ge ctx expr1 expr2 = Z3.Arithmetic.mk_ge ctx expr1 expr2
 let not_b ctx expr = Z3.Boolean.mk_not ctx expr
+let xnor_b ctx expr1 expr2 = (not_b ctx (xor_b ctx expr1 expr2))
 let eq ctx expr1 expr2 = Z3.Boolean.mk_eq ctx expr1 expr2
 let neq ctx expr1 expr2 = (not_b ctx (eq ctx expr1 expr2))
 
@@ -234,6 +236,7 @@ let rec path2expr_aux : context -> path_cond -> Expr.expr
   | AND (p1, p2) -> and_b ctx (path2expr_aux ctx p1) (path2expr_aux ctx p2)
   | OR (p1, p2) -> or_b ctx (path2expr_aux ctx p1) (path2expr_aux ctx p2)
   | IMPLY (p1, p2) -> imply ctx (path2expr_aux ctx p1) (path2expr_aux ctx p2)
+  | XNOR (p1, p2) -> xnor_b ctx (path2expr_aux ctx p1) (path2expr_aux ctx p2)
   | NOT p -> not_b ctx (path2expr_aux ctx p)
   | EQ (p1, p2) -> eq ctx (val2expr_aux ctx p1) (val2expr_aux ctx p2)
   | NOTEQ (p1, p2) -> neq ctx (val2expr_aux ctx p1) (val2expr_aux ctx p2)

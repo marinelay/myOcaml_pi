@@ -64,6 +64,7 @@ and sym_exp =
   | AND of sym_exp * sym_exp
   | OR of sym_exp * sym_exp
   | IMPLY of sym_exp * sym_exp
+  | XNOR of sym_exp * sym_exp
   | EQ of value * value
   | NOTEQ of value * value
   | LESSTHAN of value * value
@@ -163,6 +164,7 @@ and cond2str : sym_exp -> string
   | AND (e1, e2) -> "(" ^ cond2str e1 ^ " and " ^ cond2str e2 ^ ")"
   | OR (e1, e2) -> "(" ^ cond2str e1 ^ " or " ^ cond2str e2 ^ ")"
   | IMPLY (e1, e2) -> "(" ^ cond2str e1 ^ " -> " ^ cond2str e2 ^ ")"
+  | XNOR (e1, e2) -> "(" ^ cond2str e1 ^ " xnor " ^ cond2str e2 ^ ")"
   | EQ (v1, v2) -> "(" ^ value2str v1 ^ " == " ^ value2str v2 ^ ")"
   | NOTEQ (v1, v2) -> "(" ^ value2str v1 ^ " != " ^ value2str v2 ^ ")"
   | LESSTHAN (v1, v2) -> "(" ^ value2str v1 ^ " < " ^ value2str v2 ^ ")"
@@ -588,7 +590,7 @@ let rec eval_exp : exp -> env -> path_cond -> exp -> exp -> path_cond -> t_value
 
             let post_exp = eval_exp post env TRUE pre post total t_value in
             eval_exp_aux post_exp (fun v pi_post env_post total t_value ->
-              let _ = append_partial [(Return, IMPLY(pi, IMPLY(pi_post, pi_before_post)), env)] in
+              let _ = append_partial [(Return, IMPLY(pi, XNOR(pi_post, pi_before_post)), env)] in
               eval_exp UNIT env FALSE pre post total t_value
             )
           )

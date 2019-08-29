@@ -5,9 +5,9 @@ LinearSearch (int a[], int l, int u, int e, int i )
 { 
     @ l <= i and forall j. ((l<=j and j<i) -> a[j] != e)
     T : (u-i) | (u-i) >= 0
-    
+
     for (int i := l; i<=u; int i := i+1) {
-        if (a[i] = e) {return true; }
+        if (a[i] = e) { return true; }
     }
 
     return false;
