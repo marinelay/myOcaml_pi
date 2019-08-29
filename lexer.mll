@@ -30,6 +30,8 @@
     ; ("PAR", PAR)
     ; ("par", PAR)
     ; ("T", TOTAL)
+    ; ("NONE", NONE)
+    ; ("None", NONE)
   ]
 }
 

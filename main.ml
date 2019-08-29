@@ -9,7 +9,7 @@ let prog : program -> unit
   let _ = init_partial () in
   let _ = init_sym_cnt () in 
   let _ = init_total() in
-  let r1 = eval_exp p1 empty_env TRUE TRUE TRUE TRUE in
+  let r1 = eval_exp p1 empty_env TRUE TRUE TRUE TRUE [] in
   (*let rv1 = list_simplify !partial_correct in*)
   let ctx = Z3_translator.new_ctx () in
   let solver = Z3.Solver.mk_solver ctx None in
@@ -19,6 +19,9 @@ let prog : program -> unit
   | false -> print_endline ("Partial Fail")
 
   in
+
+  print_endline("");
+
   let ctx = Z3_translator.new_ctx () in
   let solver = Z3.Solver.mk_solver ctx None in
 

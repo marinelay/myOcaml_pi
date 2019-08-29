@@ -33,6 +33,7 @@
 %token BAR
 %token COLON
 %token TOTAL
+%token NONE
 
 %token EXIST, FORALL
 %token PAR
@@ -47,6 +48,7 @@
 %left SEMI
 
 %left FOR
+%left TOTAL
 
 
 %start program
@@ -58,7 +60,12 @@ program:
   ;
 
 start:
-  | AT bexp AT bexp ID LPAREN inits RPAREN LCURLY stmt RCURLY { Calc.FUNC_START ( $2, $7, $10, $4) }
+  | AT bexp AT bexp 
+    TOTAL COLON LPAREN exps RPAREN BAR bexp
+    ID LPAREN inits RPAREN LCURLY stmt RCURLY { Calc.FUNC_START ( $2, $14, $17, $4, $8, $11) }
+  | AT bexp AT bexp 
+    TOTAL COLON NONE
+    ID LPAREN inits RPAREN LCURLY stmt RCURLY { Calc.FUNC_START ( $2, $10, $13, $4, [Calc.UNIT], Calc.UNIT) }
 
 stmt:
   | stmt stmt { Calc.SEQ ($1, $2) }
@@ -69,6 +76,9 @@ stmt:
   | AT bexp TOTAL COLON LPAREN exps RPAREN BAR bexp
     FOR LPAREN assign SEMI exp SEMI assign RPAREN LCURLY stmt RCURLY 
     { Calc.FOR ($2, $6, $9, $12, $14, $16, $19) }
+  | AT bexp TOTAL COLON NONE
+    FOR LPAREN assign SEMI exp SEMI assign RPAREN LCURLY stmt RCURLY 
+    { Calc.FOR ($2, [Calc.UNIT], Calc.UNIT, $8, $10, $12, $15) }
   | RETURN bool SEMI { Calc.RETURN $2 }
   | RETURN ID LPAREN exps RPAREN SEMI { Calc.RETURN_FUNC ($4) }
 
